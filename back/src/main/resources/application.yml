@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: barbeiro-financeiro
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/barbeiro_financeiro
+    username: barbeiro
+    password: barbeiro
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
