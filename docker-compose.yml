@@ -1,16 +1,16 @@
 services:
 
   postgres:
-    image: postgres:16
+    image: postgres:17-alpine
     container_name: gestao_barbearia_postgres
 
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-barbeiro_financeiro}
+      POSTGRES_USER: ${POSTGRES_USER:-barbeiro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
 
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -19,7 +19,7 @@ services:
       - gestao_barbearia_network
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-barbeiro} -d ${POSTGRES_DB:-barbeiro_financeiro}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,11 +30,11 @@ services:
     container_name: gestao_barbearia_pgadmin
 
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-change-me-pgadmin}
 
     ports:
-      - "${PGADMIN_PORT}:80"
+      - "${PGADMIN_PORT:-5050}:80"
 
     volumes:
       - pgadmin_data:/var/lib/pgadmin
@@ -55,12 +55,12 @@ services:
     container_name: gestao_barbearia_back
 
     ports:
-      - "${BACKEND_PORT}:8080"
+      - "${BACKEND_PORT:-8080}:8080"
 
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-barbeiro_financeiro}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-barbeiro}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
 
     networks:
       - gestao_barbearia_network
@@ -70,6 +70,20 @@ services:
         condition: service_healthy
 
 
+  front:
+    image: node:22-alpine
+    container_name: gestao_barbearia_front
+    working_dir: /app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./front:/app
+      - frontend_node_modules:/app/node_modules
+    networks:
+      - gestao_barbearia_network
+
+
 volumes:
 
   postgres_data:
@@ -77,6 +91,9 @@ volumes:
 
   pgadmin_data:
     name: gestao_barbearia_pgadmin_data
+
+  frontend_node_modules:
+    name: gestao_barbearia_frontend_node_modules
 
 
 networks:

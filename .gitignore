@@ -1,1 +1,54 @@
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Java / Gradle
+**/build/
+**/.gradle/
+*.class
+*.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ
+**/.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# React / Node
+**/node_modules/
+**/dist/
+**/.vite/
+**/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker / local data
+**/docker-data/
+**/postgres-data/
+*.pid
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backups
+*.bak
+*.backup
+backups/
+**/backups/
+
+# Windows / IDE metadata
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.vscode/
+**/.vscode/
+.DS_Store
