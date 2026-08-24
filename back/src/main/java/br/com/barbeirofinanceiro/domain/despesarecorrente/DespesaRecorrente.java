@@ -1,6 +1,7 @@
 package br.com.barbeirofinanceiro.domain.despesarecorrente;
 
 import br.com.barbeirofinanceiro.domain.categoria.Categoria;
+import br.com.barbeirofinanceiro.domain.movimentacao.FormaPagamento;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -29,6 +30,10 @@ public class DespesaRecorrente {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Periodicidade periodicidade;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "forma_pagamento", nullable = false, length = 20)
+    private FormaPagamento formaPagamento;
 
     @Column(name = "data_inicio", nullable = false)
     private LocalDate dataInicio;
@@ -60,6 +65,8 @@ public class DespesaRecorrente {
     public void setDiaVencimento(short diaVencimento) { this.diaVencimento = diaVencimento; }
     public Periodicidade getPeriodicidade() { return periodicidade; }
     public void setPeriodicidade(Periodicidade periodicidade) { this.periodicidade = periodicidade; }
+    public FormaPagamento getFormaPagamento() { return formaPagamento; }
+    public void setFormaPagamento(FormaPagamento formaPagamento) { this.formaPagamento = formaPagamento; }
     public LocalDate getDataInicio() { return dataInicio; }
     public void setDataInicio(LocalDate dataInicio) { this.dataInicio = dataInicio; }
     public LocalDate getDataFim() { return dataFim; }
