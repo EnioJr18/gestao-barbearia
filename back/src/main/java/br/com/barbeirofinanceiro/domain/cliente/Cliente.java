@@ -35,7 +35,7 @@ public class Cliente {
     @PreUpdate
     void preUpdate() { updatedAt = Instant.now(); }
 
-    protected Cliente() {}
+    public Cliente() {}
 
     public UUID getId() { return id; }
     public String getNome() { return nome; }
