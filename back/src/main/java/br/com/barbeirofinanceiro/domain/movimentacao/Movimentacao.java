@@ -1,6 +1,7 @@
 package br.com.barbeirofinanceiro.domain.movimentacao;
 
 import br.com.barbeirofinanceiro.domain.categoria.Categoria;
+import br.com.barbeirofinanceiro.domain.caixa.Caixa;
 import br.com.barbeirofinanceiro.domain.despesarecorrente.DespesaRecorrente;
 import br.com.barbeirofinanceiro.domain.servico.Servico;
 import jakarta.persistence.*;
@@ -41,6 +42,8 @@ public class Movimentacao {
     private FormaPagamento formaPagamento;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "caixa_id")
+    private Caixa caixa;
     @JoinColumn(name = "servico_id")
     private Servico servico;
 
@@ -82,6 +85,8 @@ public class Movimentacao {
     public void setCategoria(Categoria categoria) { this.categoria = categoria; }
     public FormaPagamento getFormaPagamento() { return formaPagamento; }
     public void setFormaPagamento(FormaPagamento formaPagamento) { this.formaPagamento = formaPagamento; }
+    public Caixa getCaixa() { return caixa; }
+    public void setCaixa(Caixa caixa) { this.caixa = caixa; }
     public Servico getServico() { return servico; }
     public void setServico(Servico servico) { this.servico = servico; }
     public String getNomeServicoSnapshot() { return nomeServicoSnapshot; }
