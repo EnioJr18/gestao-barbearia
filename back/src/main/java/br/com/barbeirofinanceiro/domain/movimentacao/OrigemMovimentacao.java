@@ -6,4 +6,3 @@ public enum OrigemMovimentacao {
     AJUSTE,
     OUTRA
 }
-public enum OrigemMovimentacao { MANUAL, SERVICO, DESPESA_RECORRENTE }
