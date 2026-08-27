@@ -43,7 +43,7 @@ public class Item {
     @PreUpdate
     void preUpdate() { updatedAt = Instant.now(); }
 
-    protected Item() {}
+    public Item() {}
 
     public UUID getId() { return id; }
     public String getNome() { return nome; }
