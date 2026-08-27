@@ -29,7 +29,7 @@ public class VendaPagamento {
     @PrePersist
     void prePersist() { createdAt = Instant.now(); }
 
-    protected VendaPagamento() {}
+    public VendaPagamento() {}
 
     public UUID getId() { return id; }
     public Venda getVenda() { return venda; }

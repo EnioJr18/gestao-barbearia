@@ -28,13 +28,17 @@ public class Venda {
     @Column(name = "valor_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal valorTotal;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private StatusVenda status = StatusVenda.FINALIZADA;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @PrePersist
     void prePersist() { createdAt = Instant.now(); }
 
-    protected Venda() {}
+    public Venda() {}
 
     public UUID getId() { return id; }
     public Cliente getCliente() { return cliente; }
@@ -45,5 +49,7 @@ public class Venda {
     public void setDataVenda(LocalDate dataVenda) { this.dataVenda = dataVenda; }
     public BigDecimal getValorTotal() { return valorTotal; }
     public void setValorTotal(BigDecimal valorTotal) { this.valorTotal = valorTotal; }
+    public StatusVenda getStatus() { return status; }
+    public void setStatus(StatusVenda status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
 }
