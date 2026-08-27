@@ -3,6 +3,7 @@ package br.com.barbeirofinanceiro.domain.movimentacao;
 import br.com.barbeirofinanceiro.domain.categoria.Categoria;
 import br.com.barbeirofinanceiro.domain.caixa.Caixa;
 import br.com.barbeirofinanceiro.domain.despesarecorrente.DespesaRecorrente;
+import br.com.barbeirofinanceiro.domain.servico.Servico;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,6 +44,14 @@ public class Movimentacao {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caixa_id")
     private Caixa caixa;
+    @JoinColumn(name = "servico_id")
+    private Servico servico;
+
+    @Column(name = "nome_servico_snapshot", length = 120)
+    private String nomeServicoSnapshot;
+
+    @Column(name = "valor_servico_snapshot", precision = 12, scale = 2)
+    private BigDecimal valorServicoSnapshot;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "despesa_recorrente_id")
@@ -78,6 +87,12 @@ public class Movimentacao {
     public void setFormaPagamento(FormaPagamento formaPagamento) { this.formaPagamento = formaPagamento; }
     public Caixa getCaixa() { return caixa; }
     public void setCaixa(Caixa caixa) { this.caixa = caixa; }
+    public Servico getServico() { return servico; }
+    public void setServico(Servico servico) { this.servico = servico; }
+    public String getNomeServicoSnapshot() { return nomeServicoSnapshot; }
+    public void setNomeServicoSnapshot(String nomeServicoSnapshot) { this.nomeServicoSnapshot = nomeServicoSnapshot; }
+    public BigDecimal getValorServicoSnapshot() { return valorServicoSnapshot; }
+    public void setValorServicoSnapshot(BigDecimal valorServicoSnapshot) { this.valorServicoSnapshot = valorServicoSnapshot; }
     public DespesaRecorrente getDespesaRecorrente() { return despesaRecorrente; }
     public void setDespesaRecorrente(DespesaRecorrente despesaRecorrente) { this.despesaRecorrente = despesaRecorrente; }
     public String getObservacao() { return observacao; }
