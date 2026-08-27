@@ -28,7 +28,7 @@ public class ItemVenda {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotal;
 
-    protected ItemVenda() {}
+    public ItemVenda() {}
 
     public UUID getId() { return id; }
     public Venda getVenda() { return venda; }
