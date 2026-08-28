@@ -12,6 +12,8 @@ public record CaixaResponse(
         UUID id,
         LocalDate dataCaixa,
         BigDecimal valorInicial,
+        BigDecimal entradasDinheiro,
+        BigDecimal saidasDinheiro,
         BigDecimal valorEsperado,
         BigDecimal valorApurado,
         BigDecimal diferenca,
@@ -24,11 +26,18 @@ public record CaixaResponse(
         Instant updatedAt
 ) {
     public static CaixaResponse from(Caixa caixa) {
+        return from(caixa, BigDecimal.ZERO, BigDecimal.ZERO, caixa.getValorInicial());
+    }
+
+    public static CaixaResponse from(Caixa caixa, BigDecimal entradasDinheiro,
+                                     BigDecimal saidasDinheiro, BigDecimal valorEsperado) {
         return new CaixaResponse(
                 caixa.getId(),
                 caixa.getDataCaixa(),
                 caixa.getValorInicial(),
-                caixa.getValorInicial(),
+                entradasDinheiro,
+                saidasDinheiro,
+                valorEsperado,
                 caixa.getValorApurado(),
                 caixa.getDiferenca(),
                 caixa.getStatus(),

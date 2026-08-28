@@ -9,11 +9,12 @@ import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface ItemRepository extends JpaRepository<Item, UUID>, JpaSpecificationExecutor<Item> {
     List<Item> findByTipoAndAtivo(TipoItem tipo, boolean ativo);
+
+    Optional<Item> findByNomeIgnoreCase(String nome);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Item i where i.id = :id")
