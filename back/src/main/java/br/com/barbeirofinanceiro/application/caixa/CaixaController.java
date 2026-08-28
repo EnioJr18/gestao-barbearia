@@ -25,12 +25,12 @@ public class CaixaController {
     ) {
         Caixa caixa = caixaService.abrir(request.valorInicial(), authentication);
         return ResponseEntity.created(URI.create("/api/v1/caixas/" + caixa.getId()))
-                .body(CaixaResponse.from(caixa));
+                .body(resposta(caixa));
     }
 
     @GetMapping("/atual")
     public CaixaResponse atual() {
-        return CaixaResponse.from(caixaService.atual());
+        return resposta(caixaService.atual());
     }
 
     @PostMapping("/{id}/fechar")
@@ -39,6 +39,14 @@ public class CaixaController {
             @Valid @RequestBody FecharCaixaRequest request,
             Authentication authentication
     ) {
-        return CaixaResponse.from(caixaService.fechar(id, request.valorApurado(), authentication));
+        Caixa caixa = caixaService.fechar(id, request.valorApurado(), authentication);
+        return resposta(caixa);
+    }
+
+    private CaixaResponse resposta(Caixa caixa) {
+        var entradas = caixaService.entradasDinheiro(caixa);
+        var saidas = caixaService.saidasDinheiro(caixa);
+        return CaixaResponse.from(caixa, entradas, saidas, caixa.getStatus() == br.com.barbeirofinanceiro.domain.caixa.StatusCaixa.FECHADO
+                ? caixa.getValorApurado().subtract(caixa.getDiferenca()) : caixaService.valorEsperado(caixa));
     }
 }
