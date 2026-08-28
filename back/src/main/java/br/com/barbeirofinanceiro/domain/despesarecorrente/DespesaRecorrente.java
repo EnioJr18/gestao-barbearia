@@ -52,7 +52,7 @@ public class DespesaRecorrente {
 
     @PrePersist void prePersist() { Instant now = Instant.now(); createdAt = now; updatedAt = now; }
     @PreUpdate void preUpdate() { updatedAt = Instant.now(); }
-    protected DespesaRecorrente() {}
+    public DespesaRecorrente() {}
 
     public UUID getId() { return id; }
     public String getDescricao() { return descricao; }

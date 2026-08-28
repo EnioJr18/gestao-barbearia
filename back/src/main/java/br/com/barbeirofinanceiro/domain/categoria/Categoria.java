@@ -28,7 +28,7 @@ public class Categoria {
 
     @PrePersist void prePersist() { Instant now = Instant.now(); createdAt = now; updatedAt = now; }
     @PreUpdate void preUpdate() { updatedAt = Instant.now(); }
-    protected Categoria() {}
+    public Categoria() {}
 
     public UUID getId() { return id; }
     public String getNome() { return nome; }

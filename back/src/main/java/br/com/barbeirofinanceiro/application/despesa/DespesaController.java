@@ -1,0 +1,12 @@
+package br.com.barbeirofinanceiro.application.despesa;
+import br.com.barbeirofinanceiro.domain.movimentacao.*; import br.com.barbeirofinanceiro.domain.despesarecorrente.*; import jakarta.validation.Valid; import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import java.net.URI; import java.time.LocalDate; import java.util.*;
+@RestController public class DespesaController {private final DespesaService s;public DespesaController(DespesaService s){this.s=s;}
+ @PostMapping("/api/v1/movimentacoes") public ResponseEntity<DespesaResponse> criar(@Valid @RequestBody CriarMovimentacaoRequest r){Movimentacao m=s.criar(r);return ResponseEntity.created(URI.create("/api/v1/movimentacoes/"+m.getId())).body(DespesaResponse.from(m));}
+ @GetMapping("/api/v1/movimentacoes") public List<DespesaResponse> listar(@RequestParam(required=false)LocalDate dataInicial,@RequestParam(required=false)LocalDate dataFinal,@RequestParam(required=false)UUID categoria,@RequestParam(required=false)FormaPagamento formaPagamento){return s.listar(dataInicial,dataFinal,categoria,formaPagamento).stream().map(DespesaResponse::from).toList();}
+ @GetMapping("/api/v1/movimentacoes/{id}") public DespesaResponse buscar(@PathVariable UUID id){return DespesaResponse.from(s.buscar(id));}
+ @PostMapping("/api/v1/despesas-recorrentes") public ResponseEntity<DespesaRecorrenteResponse> criarRec(@Valid @RequestBody CriarDespesaRecorrenteRequest r){var d=s.criarRec(r);return ResponseEntity.created(URI.create("/api/v1/despesas-recorrentes/"+d.getId())).body(DespesaRecorrenteResponse.from(d));}
+ @GetMapping("/api/v1/despesas-recorrentes") public List<DespesaRecorrenteResponse> listarRec(){return s.listarRec().stream().map(DespesaRecorrenteResponse::from).toList();}
+ @GetMapping("/api/v1/despesas-recorrentes/{id}") public DespesaRecorrenteResponse buscarRec(@PathVariable UUID id){return DespesaRecorrenteResponse.from(s.buscarRec(id));}
+ @PutMapping("/api/v1/despesas-recorrentes/{id}") public DespesaRecorrenteResponse atualizar(@PathVariable UUID id,@Valid @RequestBody CriarDespesaRecorrenteRequest r){return DespesaRecorrenteResponse.from(s.atualizarRec(id,r));}
+ @PatchMapping("/api/v1/despesas-recorrentes/{id}/ativar") public DespesaRecorrenteResponse ativar(@PathVariable UUID id){return DespesaRecorrenteResponse.from(s.ativo(id,true));}
+ @PatchMapping("/api/v1/despesas-recorrentes/{id}/inativar") public DespesaRecorrenteResponse inativar(@PathVariable UUID id){return DespesaRecorrenteResponse.from(s.ativo(id,false));}}

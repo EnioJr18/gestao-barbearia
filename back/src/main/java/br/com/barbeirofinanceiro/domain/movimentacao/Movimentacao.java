@@ -59,7 +59,7 @@ public class Movimentacao {
 
     @PrePersist void prePersist() { Instant now = Instant.now(); createdAt = now; updatedAt = now; }
     @PreUpdate void preUpdate() { updatedAt = Instant.now(); }
-    protected Movimentacao() {}
+    public Movimentacao() {}
 
     public UUID getId() { return id; }
     public TipoMovimentacao getTipo() { return tipo; }
