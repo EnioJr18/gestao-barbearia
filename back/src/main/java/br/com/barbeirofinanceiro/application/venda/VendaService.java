@@ -4,6 +4,8 @@ import br.com.barbeirofinanceiro.domain.caixa.*;
 import br.com.barbeirofinanceiro.domain.cliente.*;
 import br.com.barbeirofinanceiro.domain.item.*;
 import br.com.barbeirofinanceiro.domain.venda.*;
+import br.com.barbeirofinanceiro.domain.venda.ItemVendaRepository;
+import br.com.barbeirofinanceiro.domain.venda.ItemRelatorioProjection;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;

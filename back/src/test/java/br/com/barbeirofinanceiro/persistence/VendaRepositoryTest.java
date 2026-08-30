@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import br.com.barbeirofinanceiro.domain.venda.StatusVenda;
+import br.com.barbeirofinanceiro.domain.venda.VendaResumoProjection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -77,6 +79,36 @@ class VendaRepositoryTest extends PostgresPersistenceTest {
         venda.setCaixa(caixa);
         venda.setDataVenda(LocalDate.of(2026, 8, 23));
         venda.setValorTotal(BigDecimal.valueOf(50));
+        venda.setStatus(StatusVenda.FINALIZADA);
         return venda;
+    }
+
+    @Test
+    void deveCalcularResumoApenasComVendasFinalizadasNoPeriodo() {
+        Caixa caixa = caixa();
+
+        Venda venda1 = venda(caixa);
+        venda1.setValorTotal(BigDecimal.valueOf(30));
+        repository.save(venda1);
+
+        Venda venda2 = venda(caixa);
+        venda2.setValorTotal(BigDecimal.valueOf(20));
+        repository.save(venda2);
+
+        Venda cancelada = venda(caixa);
+        cancelada.setValorTotal(BigDecimal.valueOf(100));
+        cancelada.setStatus(StatusVenda.CANCELADA);
+        repository.saveAndFlush(cancelada);
+
+        VendaResumoProjection resumo = repository.findResumoByDataVendaBetween(
+                LocalDate.of(2026, 8, 23),
+                LocalDate.of(2026, 8, 23)
+        );
+
+        assertThat(resumo.faturamento())
+                .isEqualByComparingTo(BigDecimal.valueOf(50));
+
+        assertThat(resumo.quantidadeVendas())
+                .isEqualTo(2);
     }
 }
