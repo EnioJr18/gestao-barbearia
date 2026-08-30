@@ -1,0 +1,3 @@
+package br.com.barbeirofinanceiro.application.despesa;
+import org.springframework.http.*; import org.springframework.web.bind.annotation.*; import java.util.Map;
+@RestControllerAdvice public class DespesaExceptionHandler { @ExceptionHandler(DespesaValidationException.class) ResponseEntity<Map<String,String>> bad(DespesaValidationException e){return ResponseEntity.badRequest().body(Map.of("message",e.getMessage()));} @ExceptionHandler(DespesaNotFoundException.class) ResponseEntity<Map<String,String>> not(DespesaNotFoundException e){return ResponseEntity.status(404).body(Map.of("message",e.getMessage()));} }
