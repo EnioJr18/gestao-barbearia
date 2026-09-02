@@ -1,0 +1,3 @@
+jwt:
+  secret: chave-secreta-de-teste-com-tamanho-suficiente-para-hmac
+  expiration: 3600000
