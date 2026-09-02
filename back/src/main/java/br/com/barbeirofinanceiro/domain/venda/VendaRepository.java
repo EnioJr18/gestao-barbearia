@@ -1,15 +1,22 @@
 package br.com.barbeirofinanceiro.domain.venda;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.List;
 
 public interface VendaRepository extends JpaRepository<Venda, UUID>, JpaSpecificationExecutor<Venda> {
+
+    @Override
+    @EntityGraph(attributePaths = {"cliente", "caixa"})
+    List<Venda> findAll(Specification<Venda> specification, Sort sort);
 
     @Query("""
         SELECT new br.com.barbeirofinanceiro.domain.venda.VendaResumoProjection(

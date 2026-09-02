@@ -11,6 +11,7 @@ import br.com.barbeirofinanceiro.domain.venda.VendaRepository;
 import br.com.barbeirofinanceiro.domain.venda.VendaResumoProjection;
 import br.com.barbeirofinanceiro.domain.venda.ClienteRelatorioProjection;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -36,6 +37,7 @@ public class RelatorioService {
         this.itemVendaRepository = itemVendaRepository;
     }
 
+    @Transactional(readOnly = true)
     public RelatorioResumoResponse buscarResumo(
             LocalDate dataInicial,
             LocalDate dataFinal
@@ -67,6 +69,7 @@ public class RelatorioService {
         );
     }
 
+    @Transactional(readOnly = true)
     public RelatorioPagamentoResponse buscarPagamentos(
             LocalDate dataInicial,
             LocalDate dataFinal
@@ -104,6 +107,7 @@ public class RelatorioService {
         );
     }
 
+    @Transactional(readOnly = true)
     public List<ItemRelatorioResponse> buscarItens(
             LocalDate dataInicial,
             LocalDate dataFinal
@@ -127,6 +131,7 @@ public class RelatorioService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<ClienteRelatorioResponse> buscarClientes(
             LocalDate dataInicial,
             LocalDate dataFinal

@@ -34,6 +34,15 @@ public class CaixaService {
 
     @Transactional
     public Caixa abrir(BigDecimal valorInicial, Authentication authentication) {
+        return abrirCaixa(valorInicial, authentication);
+    }
+
+    @Transactional
+    public CaixaResponse abrirComResposta(BigDecimal valorInicial, Authentication authentication) {
+        return resposta(abrirCaixa(valorInicial, authentication));
+    }
+
+    private Caixa abrirCaixa(BigDecimal valorInicial, Authentication authentication) {
         if (valorInicial == null || valorInicial.signum() <= 0) {
             throw new CaixaValidationException("valorInicial deve ser maior que zero");
         }
@@ -61,8 +70,26 @@ public class CaixaService {
                 .orElseThrow(() -> new CaixaNotFoundException("Nenhum caixa aberto encontrado"));
     }
 
+    @Transactional(readOnly = true)
+    public CaixaResponse atualComResposta() {
+        return resposta(atual());
+    }
+
     @Transactional
     public Caixa fechar(UUID id, BigDecimal valorApurado, Authentication authentication) {
+        return fecharCaixa(id, valorApurado, authentication);
+    }
+
+    @Transactional
+    public CaixaResponse fecharComResposta(
+            UUID id,
+            BigDecimal valorApurado,
+            Authentication authentication
+    ) {
+        return resposta(fecharCaixa(id, valorApurado, authentication));
+    }
+
+    private Caixa fecharCaixa(UUID id, BigDecimal valorApurado, Authentication authentication) {
         if (valorApurado == null || valorApurado.signum() < 0) {
             throw new CaixaValidationException("valorApurado deve ser maior ou igual a zero");
         }
@@ -91,6 +118,15 @@ public class CaixaService {
 
     public BigDecimal valorEsperado(Caixa caixa) {
         return caixa.getValorInicial().add(entradasDinheiro(caixa)).subtract(saidasDinheiro(caixa));
+    }
+
+    private CaixaResponse resposta(Caixa caixa) {
+        BigDecimal entradas = entradasDinheiro(caixa);
+        BigDecimal saidas = saidasDinheiro(caixa);
+        BigDecimal valorEsperado = caixa.getStatus() == StatusCaixa.FECHADO
+                ? caixa.getValorApurado().subtract(caixa.getDiferenca())
+                : caixa.getValorInicial().add(entradas).subtract(saidas);
+        return CaixaResponse.from(caixa, entradas, saidas, valorEsperado);
     }
 
     private Usuario resolveAuthenticatedUser(Authentication authentication) {
