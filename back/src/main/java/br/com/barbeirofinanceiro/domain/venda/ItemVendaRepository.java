@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -11,6 +12,14 @@ import java.util.UUID;
 public interface ItemVendaRepository extends JpaRepository<ItemVenda, UUID> {
 
     List<ItemVenda> findByVendaId(UUID vendaId);
+
+    @Query("""
+        SELECT iv
+        FROM ItemVenda iv
+        JOIN FETCH iv.item
+        WHERE iv.venda.id IN :vendaIds
+        """)
+    List<ItemVenda> findByVendaIdIn(@Param("vendaIds") Collection<UUID> vendaIds);
 
     @Query("""
         SELECT new br.com.barbeirofinanceiro.domain.venda.ItemRelatorioProjection(

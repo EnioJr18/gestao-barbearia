@@ -71,6 +71,20 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.pagamentos", org.hamcrest.Matchers.hasSize(2)));
     }
 
+    @Test void deveListarVendasComItensEPagamentos() throws Exception {
+        UUID item = item("Corte", TipoItem.SERVICO, "30", null);
+        criarVenda(item, 1, "PIX", "30");
+        criarVenda(item, 1, "DINHEIRO", "30");
+
+        mockMvc.perform(get("/api/v1/vendas").with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$[0].itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[0].pagamentos", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[1].itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$[1].pagamentos", org.hamcrest.Matchers.hasSize(1)));
+    }
+
     @Test void deveRejeitarPagamentoDivergenteEQuantidadeInvalida() throws Exception {
         UUID item = item("Corte", TipoItem.SERVICO, "30", null);
         String base = "\"itens\":[{\"itemId\":\"" + item + "\",\"quantidade\":%s}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":29}]";
