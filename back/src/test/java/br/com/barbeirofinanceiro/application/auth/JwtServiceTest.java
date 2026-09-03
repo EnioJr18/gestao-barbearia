@@ -1,9 +1,13 @@
 package br.com.barbeirofinanceiro.application.auth;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -71,6 +75,38 @@ class JwtServiceTest {
         String token = service.gerarToken(user);
 
         assertFalse(service.validarToken(token, outroUsuario));
+    }
+
+    @Test
+    void deveInvalidarTokenQuandoHashDaSenhaMudar() {
+        UserDetails usuarioAntesDaTroca = User.withUsername("usuario@teste.local")
+                .password("hash-antigo")
+                .roles("USER")
+                .build();
+        UserDetails usuarioDepoisDaTroca = User.withUsername("usuario@teste.local")
+                .password("hash-novo")
+                .roles("USER")
+                .build();
+
+        String token = service.gerarToken(usuarioAntesDaTroca);
+
+        assertFalse(service.validarToken(token, usuarioDepoisDaTroca));
+    }
+
+    @Test
+    void deveRejeitarTokenLegadoSemVersaoDeCredencial() {
+        UserDetails user = User.withUsername("usuario@teste.local")
+                .password("hash")
+                .roles("USER")
+                .build();
+        String tokenLegado = Jwts.builder()
+                .subject(user.getUsername())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + properties.expiration()))
+                .signWith(Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8)))
+                .compact();
+
+        assertFalse(service.validarToken(tokenLegado, user));
     }
 
     @Test

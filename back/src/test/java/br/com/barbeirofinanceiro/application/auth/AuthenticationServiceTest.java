@@ -7,6 +7,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -17,15 +18,18 @@ class AuthenticationServiceTest {
 
     private AuthenticationManager authenticationManager;
     private JwtService jwtService;
+    private UserDetailsService userDetailsService;
     private AuthenticationService service;
 
     @BeforeEach
     void setUp() {
         authenticationManager = mock(AuthenticationManager.class);
         jwtService = mock(JwtService.class);
+        userDetailsService = mock(UserDetailsService.class);
         service = new AuthenticationService(
                 authenticationManager,
-                jwtService
+                jwtService,
+                userDetailsService
         );
     }
 
@@ -52,6 +56,9 @@ class AuthenticationServiceTest {
         )).thenReturn(authentication);
 
         when(authentication.getPrincipal())
+                .thenReturn(userDetails);
+
+        when(userDetailsService.loadUserByUsername(userDetails.getUsername()))
                 .thenReturn(userDetails);
 
         when(jwtService.gerarToken(userDetails))

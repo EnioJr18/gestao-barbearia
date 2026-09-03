@@ -40,7 +40,7 @@ class CustomUserDetailsServiceTest {
         when(usuario.isAtivo())
                 .thenReturn(true);
 
-        when(usuarioRepository.findByEmail("usuario@teste.local"))
+        when(usuarioRepository.findByEmailIgnoreCase("usuario@teste.local"))
                 .thenReturn(Optional.of(usuario));
 
         UserDetails userDetails =
@@ -67,7 +67,7 @@ class CustomUserDetailsServiceTest {
 
     @Test
     void deveLancarExcecaoQuandoUsuarioNaoExiste() {
-        when(usuarioRepository.findByEmail("usuario@teste.local"))
+        when(usuarioRepository.findByEmailIgnoreCase("usuario@teste.local"))
                 .thenReturn(Optional.empty());
 
         assertThrows(
@@ -83,7 +83,7 @@ class CustomUserDetailsServiceTest {
         when(usuario.isAtivo())
                 .thenReturn(false);
 
-        when(usuarioRepository.findByEmail("usuario@teste.local"))
+        when(usuarioRepository.findByEmailIgnoreCase("usuario@teste.local"))
                 .thenReturn(Optional.of(usuario));
 
         assertThrows(
