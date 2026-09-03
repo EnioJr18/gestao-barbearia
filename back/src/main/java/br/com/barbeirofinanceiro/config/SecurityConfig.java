@@ -2,6 +2,7 @@ package br.com.barbeirofinanceiro.config;
 
 import br.com.barbeirofinanceiro.application.auth.JwtAuthenticationFilter;
 import br.com.barbeirofinanceiro.application.auth.JwtProperties;
+import br.com.barbeirofinanceiro.application.backup.ManutencaoFilter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -56,7 +58,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            ManutencaoFilter manutencaoFilter
     ) throws Exception {
 
         http
@@ -80,7 +83,8 @@ public class SecurityConfig {
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
-                );
+                )
+                .addFilterAfter(manutencaoFilter, AuthorizationFilter.class);
 
         return http.build();
     }

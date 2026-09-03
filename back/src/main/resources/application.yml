@@ -23,5 +23,12 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: 3600000
 
+backup:
+  diretorio: ${BACKUP_DIRECTORY:backups}
+  tamanho-maximo-bytes: ${BACKUP_MAX_SIZE_BYTES:536870912}
+  pg-dump: ${BACKUP_PG_DUMP:pg_dump}
+  pg-restore: ${BACKUP_PG_RESTORE:pg_restore}
+  timeout-segundos: ${BACKUP_TIMEOUT_SECONDS:300}
+
 server:
   port: 8080
