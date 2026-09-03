@@ -61,9 +61,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-barbeiro_financeiro}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-barbeiro}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      BACKUP_DIRECTORY: /app/backups
 
     networks:
       - gestao_barbearia_network
+
+    volumes:
+      - ./backups:/app/backups
 
     depends_on:
       postgres:
