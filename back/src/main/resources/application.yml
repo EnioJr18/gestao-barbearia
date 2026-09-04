@@ -3,9 +3,9 @@ spring:
     name: barbeiro-financeiro
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/barbeiro_financeiro
-    username: barbeiro
-    password: barbeiro
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -32,3 +32,8 @@ backup:
 
 server:
   port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never

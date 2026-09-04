@@ -157,6 +157,12 @@ public class VendaService {
             throw new VendaConflictException("Venda já está cancelada");
         }
 
+        Caixa caixa = caixaRepository.findByIdForUpdate(venda.getCaixa().getId())
+                .orElseThrow(() -> new VendaNotFoundException("Caixa não encontrado"));
+        if (caixa.getStatus() != br.com.barbeirofinanceiro.domain.caixa.StatusCaixa.ABERTO) {
+            throw new VendaConflictException("Não é possível cancelar uma venda de caixa fechado");
+        }
+
         for (ItemVenda linha : itemVendaRepository.findByVendaId(id)) {
             Item item = itemRepository.findByIdForUpdate(linha.getItem().getId())
                     .orElseThrow(() -> new VendaNotFoundException("Item não encontrado"));

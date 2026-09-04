@@ -6,6 +6,7 @@ import br.com.barbeirofinanceiro.application.backup.ManutencaoCoordinator;
 import br.com.barbeirofinanceiro.application.backup.PostgresBackupExecutor;
 import br.com.barbeirofinanceiro.domain.backup.BackupExecucaoRepository;
 import br.com.barbeirofinanceiro.domain.backup.BackupStatus;
+import br.com.barbeirofinanceiro.domain.backup.BackupTipo;
 import br.com.barbeirofinanceiro.domain.usuario.Usuario;
 import br.com.barbeirofinanceiro.domain.usuario.UsuarioRepository;
 import org.junit.jupiter.api.AfterAll;
@@ -19,6 +20,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -161,6 +163,16 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
     }
 
     @Test
+    void naoDeveRestaurarArquivoValidoNaoRegistradoPeloSistema() throws Exception {
+        String arquivo = criarArquivoSemRegistro();
+
+        mockMvc.perform(post("/api/v1/backups/{arquivo}/restaurar", arquivo)
+                        .header("Authorization", bearer()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void deveRestaurarArquivoValidoEInformarReinicioNecessario() throws Exception {
         String arquivo = criarArquivoBackup();
 
@@ -175,6 +187,26 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
     }
 
     @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void deveManterAplicacaoIndisponivelAposRestauracaoAteReinicio() throws Exception {
+        String arquivo = criarArquivoBackup();
+
+        mockMvc.perform(post("/api/v1/backups/{arquivo}/restaurar", arquivo)
+                        .header("Authorization", bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reinicioNecessario").value(true));
+
+        mockMvc.perform(get("/api/v1/backups").header("Authorization", bearer()))
+                .andExpect(status().isServiceUnavailable());
+        mockMvc.perform(post("/api/v1/caixas/abrir")
+                        .header("Authorization", bearer())
+                        .contentType("application/json")
+                        .content("{\"valorInicial\":100.00}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void deveBloquearEscritasEnquantoHaRestauracao() throws Exception {
         Thread restauracao = new Thread(() -> manutencaoCoordinator.executarRestauracao(() -> {
             try {
@@ -188,15 +220,23 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
         Thread.sleep(100);
 
         mockMvc.perform(post("/api/v1/caixas/abrir")
-                        .header("Authorization", bearer())
+                .header("Authorization", bearer())
                         .contentType("application/json")
                         .content("{\"valorInicial\":100.00}"))
-                .andExpect(status().isConflict());
+                .andExpect(status().isServiceUnavailable());
 
         restauracao.join();
     }
 
     private String criarArquivoBackup() throws Exception {
+        String arquivo = criarArquivoSemRegistro();
+        var execucao = br.com.barbeirofinanceiro.domain.backup.BackupExecucao.iniciar(BackupTipo.MANUAL, arquivo);
+        execucao.setStatus(BackupStatus.SUCESSO);
+        backupExecucaoRepository.saveAndFlush(execucao);
+        return arquivo;
+    }
+
+    private String criarArquivoSemRegistro() throws Exception {
         String arquivo = "backup-20260903T000000Z-123e4567-e89b-12d3-a456-426614174000.backup";
         Files.writeString(BACKUP_DIRECTORY.resolve(arquivo), "backup de teste");
         return arquivo;

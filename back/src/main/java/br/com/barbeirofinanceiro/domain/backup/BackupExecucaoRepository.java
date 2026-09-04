@@ -8,5 +8,15 @@ import java.util.UUID;
 
 public interface BackupExecucaoRepository extends JpaRepository<BackupExecucao, UUID> {
 
-    List<BackupExecucao> findByArquivoInOrderByInicioEmDesc(Collection<String> arquivos);
+    List<BackupExecucao> findByArquivoInAndTipoInAndStatusOrderByInicioEmDesc(
+            Collection<String> arquivos,
+            Collection<BackupTipo> tipos,
+            BackupStatus status
+    );
+
+    boolean existsByArquivoAndTipoInAndStatus(
+            String arquivo,
+            Collection<BackupTipo> tipos,
+            BackupStatus status
+    );
 }

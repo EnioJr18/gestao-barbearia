@@ -42,6 +42,9 @@ temp/
 # Backups
 *.bak
 *.backup
+*.dump
+*.partial
+*.backup.tmp
 backups/
 **/backups/
 

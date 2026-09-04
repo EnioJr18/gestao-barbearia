@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.Optional;
 
 @Service
 public class CaixaService {
@@ -73,6 +74,12 @@ public class CaixaService {
     @Transactional(readOnly = true)
     public CaixaResponse atualComResposta() {
         return resposta(atual());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CaixaResponse> atualComRespostaOpcional() {
+        return caixaRepository.findFirstByStatusOrderByDataCaixaDesc(StatusCaixa.ABERTO)
+                .map(this::resposta);
     }
 
     @Transactional
