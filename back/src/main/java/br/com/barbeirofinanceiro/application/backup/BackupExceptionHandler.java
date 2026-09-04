@@ -25,6 +25,11 @@ public class BackupExceptionHandler {
         return response(HttpStatus.CONFLICT, exception.getMessage());
     }
 
+    @ExceptionHandler(BackupMaintenanceException.class)
+    ResponseEntity<Map<String, String>> maintenance(BackupMaintenanceException exception) {
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+    }
+
     @ExceptionHandler(BackupExecutionException.class)
     ResponseEntity<Map<String, String>> execution(BackupExecutionException exception) {
         return response(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage());

@@ -22,13 +22,12 @@ public class ManutencaoFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        if (HttpMethod.GET.matches(request.getMethod()) || HttpMethod.OPTIONS.matches(request.getMethod())) {
+        if (HttpMethod.OPTIONS.matches(request.getMethod())) {
             return true;
         }
         String uri = request.getRequestURI();
-        return uri.equals("/api/v1/auth/login")
-                || (HttpMethod.POST.matches(request.getMethod())
-                && uri.matches("/api/v1/backups/[^/]+/restaurar"));
+        return HttpMethod.POST.matches(request.getMethod())
+                && uri.matches("/api/v1/backups/[^/]+/restaurar");
     }
 
     @Override
@@ -38,7 +37,7 @@ public class ManutencaoFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         try {
-            coordinator.executarEscrita(() -> {
+            coordinator.executarOperacao(() -> {
                 try {
                     filterChain.doFilter(request, response);
                     return null;
@@ -52,10 +51,10 @@ public class ManutencaoFilter extends OncePerRequestFilter {
                 throw ioException;
             }
             throw (ServletException) cause;
-        } catch (BackupConflictException exception) {
-            response.setStatus(HttpServletResponse.SC_CONFLICT);
+        } catch (BackupMaintenanceException exception) {
+            response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write("{\"message\":\"Sistema em manutenção para restauração de backup\"}");
+            response.getWriter().write("{\"message\":\"" + exception.getMessage() + "\"}");
         }
     }
 

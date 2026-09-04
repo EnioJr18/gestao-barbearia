@@ -33,6 +33,21 @@ public interface VendaRepository extends JpaRepository<Venda, UUID>, JpaSpecific
     );
 
     @Query("""
+        SELECT new br.com.barbeirofinanceiro.domain.venda.FaturamentoDiarioProjection(
+            v.dataVenda, COALESCE(SUM(v.valorTotal), 0)
+        )
+        FROM Venda v
+        WHERE v.status = br.com.barbeirofinanceiro.domain.venda.StatusVenda.FINALIZADA
+          AND v.dataVenda BETWEEN :dataInicial AND :dataFinal
+        GROUP BY v.dataVenda
+        ORDER BY v.dataVenda ASC
+        """)
+    List<FaturamentoDiarioProjection> buscarFaturamentoDiario(
+            @Param("dataInicial") LocalDate dataInicial,
+            @Param("dataFinal") LocalDate dataFinal
+    );
+
+    @Query("""
         SELECT new br.com.barbeirofinanceiro.domain.venda.ClienteRelatorioProjection(
             v.cliente.id, v.cliente.nome, COUNT(v), SUM(v.valorTotal)
         )

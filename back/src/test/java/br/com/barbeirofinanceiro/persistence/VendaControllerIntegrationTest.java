@@ -19,6 +19,10 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -106,6 +110,68 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
         assertThat(itemRepository.findById(item).get().getEstoque()).isEqualTo(2);
         mockMvc.perform(post("/api/v1/vendas/{id}/cancelar", venda).with(csrf()).with(user(USER)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test void naoDeveCancelarVendaDeCaixaFechado() throws Exception {
+        UUID item = item("Corte", TipoItem.SERVICO, "30", null);
+        UUID venda = criarVenda(item, 1, "PIX", "30");
+        Caixa caixa = caixaRepository.findFirstByStatusOrderByDataCaixaDesc(StatusCaixa.ABERTO).orElseThrow();
+
+        mockMvc.perform(post("/api/v1/caixas/{id}/fechar", caixa.getId())
+                        .with(user(USER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"valorApurado\":100.00}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/vendas/{id}/cancelar", venda).with(user(USER)))
+                .andExpect(status().isConflict());
+        assertThat(vendaRepository.findById(venda).orElseThrow().getStatus())
+                .isEqualTo(StatusVenda.FINALIZADA);
+    }
+
+    @Test void deveSerializarCancelamentoComFechamentoDoCaixa() throws Exception {
+        Caixa caixa = caixaRepository.findFirstByStatusOrderByDataCaixaDesc(StatusCaixa.ABERTO).orElseThrow();
+        Venda venda = new Venda();
+        venda.setCaixa(caixa);
+        venda.setDataVenda(LocalDate.now());
+        venda.setValorTotal(BigDecimal.valueOf(30));
+        venda = vendaRepository.saveAndFlush(venda);
+        VendaPagamento pagamento = new VendaPagamento();
+        pagamento.setVenda(venda);
+        pagamento.setFormaPagamento(br.com.barbeirofinanceiro.domain.movimentacao.FormaPagamento.DINHEIRO);
+        pagamento.setValor(BigDecimal.valueOf(30));
+        pagamentoRepository.saveAndFlush(pagamento);
+        UUID vendaId = venda.getId();
+
+        CountDownLatch iniciar = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Integer> fechamento = executor.submit(() -> {
+                iniciar.await();
+                return mockMvc.perform(post("/api/v1/caixas/{id}/fechar", caixa.getId())
+                                .with(user(USER))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"valorApurado\":100.00}"))
+                        .andReturn().getResponse().getStatus();
+            });
+            Future<Integer> cancelamento = executor.submit(() -> {
+                iniciar.await();
+                return mockMvc.perform(post("/api/v1/vendas/{id}/cancelar", vendaId)
+                                .with(user(USER)))
+                        .andReturn().getResponse().getStatus();
+            });
+            iniciar.countDown();
+
+            assertThat(fechamento.get()).isEqualTo(200);
+            assertThat(cancelamento.get()).isIn(200, 409);
+        }
+
+        Venda vendaFinal = vendaRepository.findById(vendaId).orElseThrow();
+        Caixa caixaFinal = caixaRepository.findById(caixa.getId()).orElseThrow();
+        BigDecimal esperado = vendaFinal.getStatus() == StatusVenda.CANCELADA
+                ? BigDecimal.valueOf(100)
+                : BigDecimal.valueOf(130);
+        assertThat(caixaFinal.getDiferenca())
+                .isEqualByComparingTo(BigDecimal.valueOf(100).subtract(esperado));
     }
 
     private UUID criarVenda(UUID item, int quantidade, String forma, String valor) throws Exception {

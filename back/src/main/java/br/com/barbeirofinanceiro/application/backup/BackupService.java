@@ -44,19 +44,26 @@ public class BackupService {
         List<Path> arquivos = storage.listar();
         Map<String, BackupExecucao> execucoes = porArquivo(arquivos.stream().map(path -> path.getFileName().toString()).toList());
         return arquivos.stream()
+                .filter(path -> execucoes.containsKey(path.getFileName().toString()))
                 .map(path -> new BackupResponse(
                         path.getFileName().toString(),
                         storage.ultimaModificacao(path),
                         storage.tamanho(path),
-                        execucoes.containsKey(path.getFileName().toString())
-                                ? execucoes.get(path.getFileName().toString()).getStatus()
-                                : BackupStatus.SUCESSO
+                        execucoes.get(path.getFileName().toString()).getStatus()
                 ))
                 .toList();
     }
 
     public RestauracaoResponse restaurar(String arquivo) {
+        maintenance.validarAplicacaoDisponivel();
         Path backup = storage.resolverExistente(arquivo);
+        if (!repository.existsByArquivoAndTipoInAndStatus(
+                arquivo,
+                List.of(BackupTipo.MANUAL, BackupTipo.AUTOMATICO),
+                BackupStatus.SUCESSO
+        )) {
+            throw new BackupNotFoundException("Arquivo de backup não encontrado");
+        }
         postgresBackupExecutor.validarBackup(backup);
         return maintenance.executarRestauracao(() -> restaurarInterno(arquivo, backup));
     }
@@ -88,6 +95,7 @@ public class BackupService {
         metadataStore.registrar(arquivo, BackupStatus.INICIADO.name(), null);
         try {
             postgresBackupExecutor.restaurarBackup(backup);
+            maintenance.marcarReinicioNecessario();
             registrarSucessoRestauracao(arquivo);
             metadataStore.registrar(arquivo, BackupStatus.SUCESSO.name(), null);
             return new RestauracaoResponse(
@@ -127,7 +135,11 @@ public class BackupService {
 
     private Map<String, BackupExecucao> porArquivo(Collection<String> arquivos) {
         Map<String, BackupExecucao> porArquivo = new HashMap<>();
-        repository.findByArquivoInOrderByInicioEmDesc(arquivos)
+        repository.findByArquivoInAndTipoInAndStatusOrderByInicioEmDesc(
+                        arquivos,
+                        List.of(BackupTipo.MANUAL, BackupTipo.AUTOMATICO),
+                        BackupStatus.SUCESSO
+                )
                 .forEach(execucao -> porArquivo.putIfAbsent(execucao.getArquivo(), execucao));
         return porArquivo;
     }

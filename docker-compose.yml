@@ -5,12 +5,12 @@ services:
     container_name: gestao_barbearia_postgres
 
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-barbeiro_financeiro}
-      POSTGRES_USER: ${POSTGRES_USER:-barbeiro}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      POSTGRES_DB: ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
 
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -19,7 +19,7 @@ services:
       - gestao_barbearia_network
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-barbeiro} -d ${POSTGRES_DB:-barbeiro_financeiro}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env} -d ${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,11 +30,14 @@ services:
     container_name: gestao_barbearia_pgadmin
 
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-change-me-pgadmin}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-}
+
+    profiles:
+      - dev-tools
 
     ports:
-      - "${PGADMIN_PORT:-5050}:80"
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
 
     volumes:
       - pgadmin_data:/var/lib/pgadmin
@@ -58,9 +61,10 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
 
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-barbeiro_financeiro}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-barbeiro}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Defina POSTGRES_DB no arquivo .env}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:?Defina POSTGRES_USER no arquivo .env}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no arquivo .env}
       BACKUP_DIRECTORY: /app/backups
 
     networks:

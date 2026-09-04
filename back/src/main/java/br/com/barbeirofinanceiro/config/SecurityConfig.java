@@ -16,9 +16,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.http.MediaType;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -71,9 +71,10 @@ public class SecurityConfig {
                         )
                 )
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(
-                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
-                        )
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeSecurityError(response, HttpStatus.UNAUTHORIZED, "Autenticação necessária"))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeSecurityError(response, HttpStatus.FORBIDDEN, "Acesso negado"))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -87,5 +88,15 @@ public class SecurityConfig {
                 .addFilterAfter(manutencaoFilter, AuthorizationFilter.class);
 
         return http.build();
+    }
+
+    private void writeSecurityError(
+            jakarta.servlet.http.HttpServletResponse response,
+            HttpStatus status,
+            String message
+    ) throws java.io.IOException {
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write("{\"message\":\"" + message + "\"}");
     }
 }
