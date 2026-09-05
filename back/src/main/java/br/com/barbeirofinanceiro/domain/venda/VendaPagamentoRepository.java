@@ -7,12 +7,15 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 public interface VendaPagamentoRepository extends JpaRepository<VendaPagamento, UUID> {
 
     List<VendaPagamento> findByVendaId(UUID vendaId);
+
+    List<VendaPagamento> findByVendaIdIn(Collection<UUID> vendaIds);
 
     @Query("""
         SELECT COALESCE(SUM(p.valor), 0)

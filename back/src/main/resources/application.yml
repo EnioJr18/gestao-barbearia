@@ -3,9 +3,9 @@ spring:
     name: barbeiro-financeiro
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/barbeiro_financeiro
-    username: barbeiro
-    password: barbeiro
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -19,5 +19,21 @@ spring:
   flyway:
     enabled: true
 
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 3600000
+
+backup:
+  diretorio: ${BACKUP_DIRECTORY:backups}
+  tamanho-maximo-bytes: ${BACKUP_MAX_SIZE_BYTES:536870912}
+  pg-dump: ${BACKUP_PG_DUMP:pg_dump}
+  pg-restore: ${BACKUP_PG_RESTORE:pg_restore}
+  timeout-segundos: ${BACKUP_TIMEOUT_SECONDS:300}
+
 server:
   port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never

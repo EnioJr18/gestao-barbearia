@@ -36,6 +36,15 @@ public class BackupExecucao {
     @PrePersist void prePersist() { if (inicioEm == null) inicioEm = Instant.now(); }
     protected BackupExecucao() {}
 
+    public static BackupExecucao iniciar(BackupTipo tipo, String arquivo) {
+        BackupExecucao execucao = new BackupExecucao();
+        execucao.setTipo(tipo);
+        execucao.setStatus(BackupStatus.INICIADO);
+        execucao.setArquivo(arquivo);
+        execucao.setInicioEm(Instant.now());
+        return execucao;
+    }
+
     public UUID getId() { return id; }
     public BackupTipo getTipo() { return tipo; }
     public void setTipo(BackupTipo tipo) { this.tipo = tipo; }
