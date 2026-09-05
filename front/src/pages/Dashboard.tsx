@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -24,6 +24,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useCloseCaixa } from '@/hooks/caixa/useCloseCaixa'
+import { useCurrentCaixa } from '@/hooks/caixa/useCurrentCaixa'
+import { useOpenCaixa } from '@/hooks/caixa/useOpenCaixa'
 
 const chart = [
   { day: '01', value: 280 },
@@ -40,14 +43,64 @@ const sales = [
   { client: 'Caio Nascimento', item: 'Pomada modeladora', value: 'R$ 42,90' },
 ]
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value)
+
 export function Dashboard() {
-  const [open, setOpen] = useState(true)
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const {
+    data: caixa,
+    isLoading: caixaLoading,
+    error: caixaError,
+  } = useCurrentCaixa()
+  const openCaixaMutation = useOpenCaixa()
+  const closeCaixaMutation = useCloseCaixa()
+
+  const caixaAberta = caixa?.status === 'ABERTO'
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const saldoAtual = caixa ? Number(caixa.valorEsperado ?? 0) : 0
+  const entradas = caixa ? Number(caixa.entradasDinheiro ?? 0) : 0
+  const saidas = caixa ? Number(caixa.saidasDinheiro ?? 0) : 0
+
+  const handleToggleCaixa = () => {
+    if (caixaAberta && caixa) {
+      closeCaixaMutation.mutate({
+        id: caixa.id,
+        payload: {
+          valorApurado: caixa.valorEsperado ?? caixa.valorInicial ?? 0,
+        },
+      })
+      return
+    }
+
+    openCaixaMutation.mutate({
+      valorInicial: caixa?.valorInicial ? Number(caixa.valorInicial) : 100,
+    })
+  }
+
   return (
     <>
       <div className="mb-8 flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <p className="text-[11px] font-bold tracking-[0.12em] text-primary">
-            QUARTA-FEIRA, 27 DE AGOSTO
+            {currentTime
+              .toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+              })
+              .replace(/(^\w)/, (char) => char.toUpperCase())}
           </p>
           <h1 className="mt-2 mb-1 font-heading text-3xl font-bold tracking-tight">
             Bom dia, Marcos <span>✦</span>
@@ -56,10 +109,45 @@ export function Dashboard() {
             Aqui está o resumo da sua barbearia hoje.
           </p>
         </div>
-        <Button>
-          <FiPlus /> Novo pedido
-        </Button>
+        <div className="flex items-center gap-3 self-center sm:self-end">
+          <div className="rounded-xl border bg-background px-3 py-2 text-right shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Hora atual
+            </p>
+            <p className="font-heading text-xl font-bold tracking-tight text-foreground">
+              {currentTime.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
+            </p>
+          </div>
+          <Button
+            variant={caixaAberta ? 'outline' : 'default'}
+            onClick={handleToggleCaixa}
+            disabled={
+              caixaLoading ||
+              openCaixaMutation.isPending ||
+              closeCaixaMutation.isPending
+            }
+            className="whitespace-nowrap"
+          >
+            {caixaLoading
+              ? 'Carregando...'
+              : caixaAberta
+                ? 'Fechar caixa'
+                : 'Abrir caixa'}
+          </Button>
+          <Button>
+            <FiPlus /> Novo pedido
+          </Button>
+        </div>
       </div>
+      {caixaError ? (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Não foi possível carregar o caixa no momento.
+        </div>
+      ) : null}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           icon={<FiDollarSign />}
@@ -72,12 +160,14 @@ export function Dashboard() {
       </div>
       <div className="mb-4 grid gap-4 lg:grid-cols-[1.55fr_1fr]">
         <Card className="min-h-72">
-          <CardHeader>
-            <CardTitle>Faturamento do mês</CardTitle>
-            <CardDescription>
-              Acompanhe a evolução das suas vendas
-            </CardDescription>
-            <select className="float-right -mt-10 rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground">
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div>
+              <CardTitle>Faturamento do mês</CardTitle>
+              <CardDescription>
+                Acompanhe a evolução das suas vendas
+              </CardDescription>
+            </div>
+            <select className="rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground">
               <option>Agosto 2026</option>
               <option>2026</option>
             </select>
@@ -101,19 +191,23 @@ export function Dashboard() {
             <div className="card-heading-line">
               <div>
                 <CardTitle>Caixa do dia</CardTitle>
-                <CardDescription>27 de agosto, 2026</CardDescription>
+                <CardDescription>
+                  {caixa?.dataCaixa
+                    ? new Date(caixa.dataCaixa).toLocaleDateString('pt-BR')
+                    : 'Carregando data...'}
+                </CardDescription>
               </div>
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${open ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ${caixaAberta ? 'bg-emerald-50 text-emerald-700' : 'bg-muted text-muted-foreground'}`}
               >
                 <i className="size-1.5 rounded-full bg-emerald-500" />
-                {open ? 'Aberto' : 'Fechado'}
+                {caixaAberta ? 'Aberto' : 'Fechado'}
               </span>
             </div>
           </CardHeader>
           <CardContent>
             <div className="mt-4 font-heading text-3xl font-bold">
-              R$ 842,90
+              {caixa ? formatCurrency(saldoAtual) : 'R$ 0,00'}
             </div>
             <p className="my-1 mb-6 text-sm text-muted-foreground">
               Saldo atual
@@ -121,19 +215,32 @@ export function Dashboard() {
             <div className="grid gap-3 border-y py-3 text-sm">
               <div>
                 <span>Entradas</span>
-                <b className="text-emerald-600">+ R$ 910,00</b>
+                <b className="text-emerald-600">
+                  + {caixa ? formatCurrency(entradas) : 'R$ 0,00'}
+                </b>
               </div>
               <div>
                 <span>Saídas</span>
-                <b className="text-red-500">- R$ 67,10</b>
+                <b className="text-red-500">
+                  - {caixa ? formatCurrency(saidas) : 'R$ 0,00'}
+                </b>
               </div>
             </div>
             <Button
-              variant={open ? 'outline' : 'default'}
+              variant={caixaAberta ? 'outline' : 'default'}
               className="mt-5 w-full"
-              onClick={() => setOpen(!open)}
+              onClick={handleToggleCaixa}
+              disabled={
+                caixaLoading ||
+                openCaixaMutation.isPending ||
+                closeCaixaMutation.isPending
+              }
             >
-              {open ? 'Fechar caixa' : 'Abrir caixa'}
+              {caixaLoading
+                ? 'Carregando...'
+                : caixaAberta
+                  ? 'Fechar caixa'
+                  : 'Abrir caixa'}
             </Button>
           </CardContent>
         </Card>

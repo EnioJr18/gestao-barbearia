@@ -7,54 +7,57 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useAllItens } from '@/hooks/item/useAllItens'
+import { useCreateItem } from '@/hooks/item/useCreateItem'
+import { useInactiveItem } from '@/hooks/item/useInactiveItem'
+import type { TipoItem } from '@/hooks/item/types'
 
-type Item = {
-  name: string
-  type: 'Serviço' | 'Produto'
-  price: string
-  stock: string
-}
 const schema = z.object({
-  name: z.string().min(2, 'Informe o nome'),
-  price: z.string().min(1, 'Informe o preço'),
-  type: z.enum(['Serviço', 'Produto']),
+  nome: z.string().min(2, 'Informe o nome'),
+  preco: z.coerce.number().min(0, 'Informe um preço válido'),
+  tipo: z.enum(['SERVICO', 'PRODUTO']),
+  estoque: z.coerce.number().int().min(0).optional(),
 })
 type FormData = z.infer<typeof schema>
-const initial: Item[] = [
-  { name: 'Corte tradicional', type: 'Serviço', price: 'R$ 35,00', stock: '—' },
-  { name: 'Corte + barba', type: 'Serviço', price: 'R$ 55,00', stock: '—' },
-  {
-    name: 'Pomada modeladora',
-    type: 'Produto',
-    price: 'R$ 42,90',
-    stock: '18 un.',
-  },
-  {
-    name: 'Salgadinho artesanal',
-    type: 'Produto',
-    price: 'R$ 8,00',
-    stock: '32 un.',
-  },
-]
+type FormInput = z.input<typeof schema>
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+    value,
+  )
+
 export function Produtos() {
-  const [items, setItems] = useState(initial)
   const [modal, setModal] = useState(false)
-  const form = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { type: 'Serviço' },
+  const [search, setSearch] = useState('')
+  const [tipo, setTipo] = useState<TipoItem | ''>('')
+  const {
+    data: items = [],
+    isLoading,
+    error,
+  } = useAllItens({
+    nome: search || undefined,
+    tipo: tipo || undefined,
   })
-  const type = useWatch({ control: form.control, name: 'type' })
+  const createItemMutation = useCreateItem()
+  const inactiveItemMutation = useInactiveItem()
+  const form = useForm<FormInput, unknown, FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { tipo: 'SERVICO', estoque: 0 },
+  })
+  const type = useWatch({ control: form.control, name: 'tipo' })
   const submit = (data: FormData) => {
-    setItems([
-      ...items,
+    createItemMutation.mutate(
       {
         ...data,
-        price: `R$ ${data.price}`,
-        stock: data.type === 'Produto' ? '0 un.' : '—',
+        estoque: data.tipo === 'PRODUTO' ? (data.estoque ?? 0) : null,
       },
-    ])
-    form.reset({ type: 'Serviço' })
-    setModal(false)
+      {
+        onSuccess: () => {
+          form.reset({ tipo: 'SERVICO', estoque: 0 })
+          setModal(false)
+        },
+      },
+    )
   }
   return (
     <>
@@ -78,12 +81,20 @@ export function Produtos() {
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
             <FiSearch />
-            <input placeholder="Buscar no catálogo" />
+            <input
+              placeholder="Buscar no catálogo"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
           </div>
-          <select className="h-10 rounded-lg border bg-background px-3 text-sm text-muted-foreground">
-            <option>Todos os tipos</option>
-            <option>Serviços</option>
-            <option>Produtos</option>
+          <select
+            value={tipo}
+            onChange={(event) => setTipo(event.target.value as TipoItem | '')}
+            className="h-10 rounded-lg border bg-background px-3 text-sm text-muted-foreground"
+          >
+            <option value="">Todos os tipos</option>
+            <option value="SERVICO">Serviços</option>
+            <option value="PRODUTO">Produtos</option>
           </select>
         </div>
         <table className="w-full min-w-175 border-collapse">
@@ -107,33 +118,58 @@ export function Produtos() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr
-                className="border-b transition-colors hover:bg-muted/25 last:border-0"
-                key={item.name}
-              >
-                <td className="px-5 py-5 text-sm font-semibold text-foreground">
-                  {item.name}
-                </td>
-                <td className="px-5 py-5 text-sm text-muted-foreground">
-                  <span className="rounded-md bg-muted px-2.5 py-1 text-[11px] font-medium">
-                    {item.type}
-                  </span>
-                </td>
-                <td className="px-5 py-5 text-sm text-muted-foreground">
-                  {item.price}
-                </td>
-                <td className="px-5 py-5 text-sm text-muted-foreground">
-                  {item.stock}
-                </td>
-                <td className="px-5 py-5 text-sm">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700">
-                    <i className="size-1.5 rounded-full bg-emerald-500" />
-                    Ativo
-                  </span>
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="text-center">
+                  Carregando itens...
                 </td>
               </tr>
-            ))}
+            ) : error ? (
+              <tr>
+                <td colSpan={5} className="text-center text-red-600">
+                  Não foi possível carregar o catálogo.
+                </td>
+              </tr>
+            ) : items.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center">
+                  Nenhum item encontrado.
+                </td>
+              </tr>
+            ) : (
+              items.map((item) => (
+                <tr
+                  className="border-b transition-colors hover:bg-muted/25 last:border-0"
+                  key={item.id}
+                >
+                  <td className="px-5 py-5 text-sm font-semibold text-foreground">
+                    {item.nome}
+                  </td>
+                  <td className="px-5 py-5 text-sm text-muted-foreground">
+                    <span className="rounded-md bg-muted px-2.5 py-1 text-[11px] font-medium">
+                      {item.tipo === 'SERVICO' ? 'Serviço' : 'Produto'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-5 text-sm text-muted-foreground">
+                    {formatCurrency(Number(item.preco))}
+                  </td>
+                  <td className="px-5 py-5 text-sm text-muted-foreground">
+                    {item.tipo === 'PRODUTO' ? `${item.estoque ?? 0} un.` : '—'}
+                  </td>
+                  <td className="px-5 py-5 text-sm">
+                    <button
+                      onClick={() =>
+                        item.ativo && inactiveItemMutation.mutate(item.id)
+                      }
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700"
+                    >
+                      <i className="size-1.5 rounded-full bg-emerald-500" />
+                      {item.ativo ? 'Ativo' : 'Inativo'}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </Card>
@@ -168,36 +204,55 @@ export function Produtos() {
               <Input
                 id="item-name"
                 placeholder="Ex.: Corte degradê"
-                {...form.register('name')}
+                {...form.register('nome')}
               />
-              {form.formState.errors.name && (
+              {form.formState.errors.nome && (
                 <small className="text-[10px] text-red-500">
-                  {form.formState.errors.name.message}
+                  {form.formState.errors.nome.message}
                 </small>
               )}
               <Label htmlFor="item-price">Preço</Label>
               <Input
                 id="item-price"
                 placeholder="35,00"
-                {...form.register('price')}
+                type="number"
+                step="0.01"
+                {...form.register('preco')}
               />
+              {form.formState.errors.preco && (
+                <small className="text-[10px] text-red-500">
+                  {form.formState.errors.preco.message}
+                </small>
+              )}
               <Label>Tipo</Label>
               <div className="grid grid-cols-2 gap-2">
-                {['Serviço', 'Produto'].map((option) => (
+                {(['SERVICO', 'PRODUTO'] as const).map((option) => (
                   <button
                     type="button"
                     key={option}
                     className={`rounded-md border p-2 text-xs ${type === option ? 'border-emerald-300 bg-emerald-50 font-bold text-primary' : 'text-muted-foreground'}`}
-                    onClick={() =>
-                      form.setValue('type', option as FormData['type'])
-                    }
+                    onClick={() => form.setValue('tipo', option)}
                   >
-                    {option}
+                    {option === 'SERVICO' ? 'Serviço' : 'Produto'}
                   </button>
                 ))}
               </div>
+              {type === 'PRODUTO' && (
+                <>
+                  <Label htmlFor="item-stock">Estoque inicial</Label>
+                  <Input
+                    id="item-stock"
+                    type="number"
+                    min="0"
+                    {...form.register('estoque')}
+                  />
+                </>
+              )}
               <Button type="submit" className="mt-3">
-                <FiPlus /> Adicionar ao catálogo
+                <FiPlus />{' '}
+                {createItemMutation.isPending
+                  ? 'Salvando...'
+                  : 'Adicionar ao catálogo'}
               </Button>
             </form>
           </div>

@@ -23,7 +23,6 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { Separator } from '@/components/ui/separator'
 
 const links = [
   { to: '/dashboard', label: 'Visão geral', icon: FiGrid },
@@ -40,7 +39,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-3">
+          <div className="flex items-center gap-2">
             <div className="grid size-8 shrink-0 place-items-center rounded-lg rounded-bl-sm bg-primary font-heading text-lg font-bold text-primary-foreground">
               C
             </div>
@@ -70,10 +69,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   >
                     <>
                       <Icon />
-                      <span>{label}</span>
-                      {to === '/produtos' && (
-                        <span className="ml-auto text-[10px]">4</span>
-                      )}
+                      <span className='flex justify-center items-center'>{label}</span>
                     </>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -110,29 +106,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-background px-4 md:px-8">
-          <SidebarTrigger
-            className="size-9 [&_svg]:size-5"
-            aria-label="Abrir ou fechar menu"
-          />
-          <Separator orientation="vertical" className="h-5" />
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Workspace</span>
-            <span>/</span>
-            <strong className="text-foreground">
-              {current?.label ?? 'Visão geral'}
-            </strong>
-          </div>
-          <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            <span className="hidden sm:inline">Operação aberta</span>
-            <div className="grid size-7 place-items-center rounded-full bg-emerald-100 text-[10px] font-bold text-primary">
-              MS
-            </div>
-          </div>
-        </header>
         <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
-          <div className="mx-auto w-full max-w-[1600px] p-4 md:px-10 md:py-8 xl:px-14">
+         <SidebarTrigger
+              className="size-10 [&_svg]:size-5 m-3 text-2xl"
+              aria-label="Abrir ou fechar menu"
+            />
+          <div className="mx-auto w-full max-w-[1600px] p-4 md:px-5 md:py-5 xl:px-8">
             {children}
           </div>
         </main>

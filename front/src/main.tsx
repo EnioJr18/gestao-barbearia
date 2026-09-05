@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import './App.css'
 import App from './App.tsx'
@@ -10,11 +11,19 @@ import { Produtos } from './pages/Produtos.tsx'
 import { Clientes } from './pages/Clientes.tsx'
 import { Pedidos } from './pages/Pedidos.tsx'
 import { Relatorios } from './pages/Relatorios.tsx'
+import { Login } from './pages/Login.tsx'
+import { ProtectedRoute } from './components/ProtectedRoute.tsx'
+
+const queryClient = new QueryClient()
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <App />,
+    element: (
+      <ProtectedRoute>
+        <App />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Dashboard /> },
       { path: 'dashboard', element: <Dashboard /> },
@@ -24,6 +33,7 @@ const router = createBrowserRouter([
       { path: 'relatorios', element: <Relatorios /> },
     ],
   },
+  { path: '/login', element: <Login /> },
   // {
   //   path: "/pagamento/sucesso",
   //   element: <Sucesso />,
@@ -34,6 +44,8 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   </StrictMode>,
 )

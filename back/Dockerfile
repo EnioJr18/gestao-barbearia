@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN chmod +x gradlew && ./gradlew clean bootJar --no-daemon
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew && ./gradlew clean bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre
 
