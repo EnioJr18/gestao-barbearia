@@ -76,7 +76,7 @@ export function Relatorios() {
             <div className="chart-wrap large">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthly}>
-                  <CartesianGrid vertical={false} stroke="#e9eef0" />
+                  <CartesianGrid vertical={false} stroke="#302b27" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} />
                   <YAxis axisLine={false} tickLine={false} />
                   <Tooltip />

@@ -204,11 +204,11 @@ export function Dashboard() {
             <div className="mt-3 h-60">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chart}>
-                  <CartesianGrid vertical={false} stroke="#e9eef0" />
+                  <CartesianGrid vertical={false} stroke="#302b27" />
                   <XAxis dataKey="day" axisLine={false} tickLine={false} />
                   <YAxis axisLine={false} tickLine={false} />
                   <Tooltip />
-                  <Bar dataKey="value" fill="#0d6b68" radius={[5, 5, 0, 0]} />
+                  <Bar dataKey="value" fill="#efad43" radius={[5, 5, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
