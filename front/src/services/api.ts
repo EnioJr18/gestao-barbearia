@@ -14,3 +14,24 @@ api.interceptors.request.use((config) => {
 
   return config
 })
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+    const requestUrl = error.config?.url ?? ''
+    const isAuthenticationRequest = requestUrl.includes('/auth/login')
+
+    if (status === 401 && !isAuthenticationRequest) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('tipoToken')
+      window.dispatchEvent(new Event('auth:logout'))
+
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login')
+      }
+    }
+
+    return Promise.reject(error)
+  },
+)

@@ -24,6 +24,20 @@ public class UsuarioService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional
+    public UsuarioResponse criar(CriarUsuarioRequest request) {
+        String email = normalizarEmail(request.email());
+        if (usuarioRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new UsuarioConflictException("Já existe um usuário com este e-mail");
+        }
+
+        Usuario usuario = Usuario.novo();
+        usuario.setNome(request.nome().trim());
+        usuario.setEmail(email);
+        usuario.setSenhaHash(passwordEncoder.encode(request.senha()));
+        return UsuarioResponse.from(salvar(usuario));
+    }
+
     @Transactional(readOnly = true)
     public UsuarioResponse consultarAtual(Authentication authentication) {
         return UsuarioResponse.from(usuarioAutenticado(authentication));

@@ -31,8 +31,10 @@ public class CaixaController {
     }
 
     @GetMapping("/atual")
-    public CaixaResponse atual() {
-        return caixaService.atualComResposta();
+    public ResponseEntity<CaixaResponse> atual() {
+        return caixaService.atualComRespostaOpcional()
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.<CaixaResponse>noContent().build());
     }
 
     @PostMapping("/{id}/fechar")

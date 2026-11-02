@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AxiosError } from 'axios'
 import {
   Bar,
   BarChart,
@@ -12,7 +13,6 @@ import {
   FiActivity,
   FiArrowUpRight,
   FiDollarSign,
-  FiPlus,
   FiShoppingBag,
   FiUsers,
 } from 'react-icons/fi'
@@ -27,6 +27,7 @@ import {
 import { useCloseCaixa } from '@/hooks/caixa/useCloseCaixa'
 import { useCurrentCaixa } from '@/hooks/caixa/useCurrentCaixa'
 import { useOpenCaixa } from '@/hooks/caixa/useOpenCaixa'
+import { useMeUser } from '@/hooks/user/useMeUser'
 
 const chart = [
   { day: '01', value: 280 },
@@ -54,12 +55,22 @@ export function Dashboard() {
   const {
     data: caixa,
     isLoading: caixaLoading,
+    isFetching: caixaFetching,
     error: caixaError,
   } = useCurrentCaixa()
   const openCaixaMutation = useOpenCaixa()
   const closeCaixaMutation = useCloseCaixa()
 
   const caixaAberta = caixa?.status === 'ABERTO'
+  const caixaMutationError = openCaixaMutation.error ?? closeCaixaMutation.error
+  const caixaMutationErrorMessage =
+    caixaMutationError instanceof AxiosError
+      ? (caixaMutationError.response?.data?.message ??
+        'Não foi possível atualizar o caixa.')
+      : caixaMutationError?.message
+
+  const { data: user } = useMeUser()
+  const userName = user?.nome ?? 'Usuário'
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -69,11 +80,25 @@ export function Dashboard() {
     return () => window.clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    if (caixa === null && openCaixaMutation.error) {
+      openCaixaMutation.reset()
+    }
+  }, [caixa, openCaixaMutation])
+
   const saldoAtual = caixa ? Number(caixa.valorEsperado ?? 0) : 0
   const entradas = caixa ? Number(caixa.entradasDinheiro ?? 0) : 0
   const saidas = caixa ? Number(caixa.saidasDinheiro ?? 0) : 0
 
   const handleToggleCaixa = () => {
+    if (
+      caixaFetching ||
+      openCaixaMutation.isPending ||
+      closeCaixaMutation.isPending
+    ) {
+      return
+    }
+
     if (caixaAberta && caixa) {
       closeCaixaMutation.mutate({
         id: caixa.id,
@@ -93,7 +118,7 @@ export function Dashboard() {
     <>
       <div className="mb-8 flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="text-[11px] font-bold tracking-[0.12em] text-primary">
+          <p className="text-[13px] font-bold tracking-[0.12em] text-primary">
             {currentTime
               .toLocaleDateString('pt-BR', {
                 weekday: 'long',
@@ -103,7 +128,7 @@ export function Dashboard() {
               .replace(/(^\w)/, (char) => char.toUpperCase())}
           </p>
           <h1 className="mt-2 mb-1 font-heading text-3xl font-bold tracking-tight">
-            Bom dia, Marcos <span>✦</span>
+            Bom dia, {userName} <span>✦</span>
           </h1>
           <p className="text-base leading-6 text-muted-foreground">
             Aqui está o resumo da sua barbearia hoje.
@@ -127,10 +152,11 @@ export function Dashboard() {
             onClick={handleToggleCaixa}
             disabled={
               caixaLoading ||
+              caixaFetching ||
               openCaixaMutation.isPending ||
               closeCaixaMutation.isPending
             }
-            className="whitespace-nowrap"
+            className="h-10 px-4 text-sm whitespace-nowrap [&_svg:not([class*='size-'])]:size-4"
           >
             {caixaLoading
               ? 'Carregando...'
@@ -138,14 +164,16 @@ export function Dashboard() {
                 ? 'Fechar caixa'
                 : 'Abrir caixa'}
           </Button>
-          <Button>
-            <FiPlus /> Novo pedido
-          </Button>
         </div>
       </div>
       {caixaError ? (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           Não foi possível carregar o caixa no momento.
+        </div>
+      ) : null}
+      {caixaMutationErrorMessage ? (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {caixaMutationErrorMessage}
         </div>
       ) : null}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -228,7 +256,7 @@ export function Dashboard() {
             </div>
             <Button
               variant={caixaAberta ? 'outline' : 'default'}
-              className="mt-5 w-full"
+              className="mt-5 h-10 w-full px-4 text-sm [&_svg:not([class*='size-'])]:size-4"
               onClick={handleToggleCaixa}
               disabled={
                 caixaLoading ||

@@ -81,22 +81,26 @@ export function Pedidos() {
             Registre vendas e acompanhe o histórico da operação.
           </p>
         </div>
-        <Button onClick={() => setForm(!form)}>
+        <Button
+          size="lg"
+          className="h-10 px-4 text-sm [&_svg:not([class*='size-'])]:size-4"
+          onClick={() => setForm(!form)}
+        >
           <FiPlus /> Novo pedido
         </Button>
       </div>
       {form && (
         <Card className="mb-4 grid gap-3 p-5 md:grid-cols-4 md:items-end">
           <div>
-            <h2 className="font-heading text-lg font-bold">Novo pedido</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="font-heading text-3xl font-bold">Novo pedido</h2>
+            <p className="text-md text-muted-foreground">
               Escolha cliente, item e pagamento.
             </p>
           </div>
           <select
             value={clientId}
             onChange={(event) => setClientId(event.target.value)}
-            className="h-10 rounded-lg border bg-background px-3 text-sm"
+            className="h-12 rounded-lg border bg-background px-3 text-lg"
           >
             <option value="">Cliente avulso</option>
             {clients.map((client) => (
@@ -108,7 +112,7 @@ export function Pedidos() {
           <select
             value={itemId}
             onChange={(event) => setItemId(event.target.value)}
-            className="h-10 rounded-lg border bg-background px-3 text-sm"
+            className="h-12 rounded-lg border bg-background px-3 text-lg"
           >
             <option value="">Selecione o item</option>
             {items.map((item) => (
@@ -123,14 +127,14 @@ export function Pedidos() {
               min="1"
               value={quantity}
               onChange={(event) => setQuantity(Number(event.target.value))}
-              className="w-20"
+              className="h-12 w-24 text-lg"
             />
             <select
               value={payment}
               onChange={(event) =>
                 setPayment(event.target.value as FormaPagamento)
               }
-              className="h-10 min-w-0 flex-1 rounded-lg border bg-background px-2 text-sm"
+              className="h-12 min-w-0 flex-1 rounded-lg border bg-background px-2 text-lg"
             >
               {Object.entries(paymentLabels).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -140,7 +144,8 @@ export function Pedidos() {
             </select>
           </div>
           <Button
-            className="md:col-span-4"
+            size="lg"
+            className="h-12 px-4 text-lg [&_svg:not([class*='size-'])]:size-4 md:col-span-4"
             onClick={submit}
             disabled={createVendaMutation.isPending || !itemId}
           >
@@ -156,14 +161,14 @@ export function Pedidos() {
         </Card>
       )}
       <Card className="overflow-hidden rounded-xl border shadow-sm">
-        <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
             <FiSearch />
             <input
               placeholder="Buscar pedido ou cliente"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="w-full bg-transparent text-sm outline-none"
+              className="w-full bg-transparent text-lg outline-none"
             />
           </div>
           <span className="text-sm text-muted-foreground">
@@ -171,7 +176,7 @@ export function Pedidos() {
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table>
+          <table className="text-lg [&_td]:text-lg [&_th]:text-sm">
             <thead>
               <tr>
                 <th>PEDIDO</th>

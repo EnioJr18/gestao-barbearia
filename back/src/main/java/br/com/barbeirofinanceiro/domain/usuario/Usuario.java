@@ -42,6 +42,10 @@ public class Usuario {
 
     protected Usuario() {}
 
+    public static Usuario novo() {
+        return new Usuario();
+    }
+
     public UUID getId() { return id; }
     public String getNome() { return nome; }
     public void setNome(String nome) { this.nome = nome; }

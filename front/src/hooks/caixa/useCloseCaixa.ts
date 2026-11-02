@@ -21,8 +21,9 @@ export const useCloseCaixa = () => {
 
   return useMutation({
     mutationFn: closeCaixa,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['caixa'] })
+    onSuccess: async () => {
+      queryClient.setQueryData(['caixa', 'atual'], null)
+      await queryClient.invalidateQueries({ queryKey: ['caixa'] })
     },
   })
 }

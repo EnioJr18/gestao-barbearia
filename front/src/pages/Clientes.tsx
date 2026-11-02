@@ -75,7 +75,11 @@ export function Clientes() {
             Conheça quem mantém sua cadeira em movimento.
           </p>
         </div>
-        <Button onClick={() => setModal(true)}>
+        <Button
+          size="lg"
+          className="h-10 px-4 text-sm [&_svg:not([class*='size-'])]:size-4"
+          onClick={() => setModal(true)}
+        >
           <FiPlus /> Novo cliente
         </Button>
       </div>
@@ -87,29 +91,29 @@ export function Clientes() {
               placeholder="Buscar cliente"
               value={buscar}
               onChange={(event) => setBuscar(event.target.value)}
-              className="w-full border-0 bg-transparent text-base outline-none"
+              className="w-full border-0 bg-transparent text-lg outline-none"
             />
           </div>
           <span className="text-sm text-muted-foreground">
             {filteredClientes.length} clientes cadastrados
           </span>
         </div>
-        <table className="w-full min-w-[700px] border-collapse">
+        <table className="w-full min-w-[700px] border-collapse text-lg [&_td]:text-lg [&_th]:text-sm">
           <thead className="bg-muted/40">
             <tr>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 CLIENTE
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 TELEFONE
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 VISITAS
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 TOTAL GASTO
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 ÚLTIMA VISITA
               </th>
             </tr>
@@ -141,7 +145,7 @@ export function Clientes() {
                 >
                   <td>
                     <div className="flex items-center gap-3 px-5 py-5">
-                      <div className="grid size-8 place-items-center rounded-full bg-emerald-100 text-[10px] font-bold text-primary">
+                      <div className="grid size-8 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-primary">
                         {cliente.nome
                           .split(' ')
                           .map((part) => part[0])
@@ -153,18 +157,18 @@ export function Clientes() {
                       </strong>
                     </div>
                   </td>
-                  <td className="px-5 py-5 text-sm text-muted-foreground">
+                  <td className="px-5 py-5 text-base text-muted-foreground">
                     {cliente.telefone || '—'}
                   </td>
-                  <td className="px-5 py-5 text-sm text-muted-foreground">
+                  <td className="px-5 py-5 text-base text-muted-foreground">
                     {12 - index}
                   </td>
-                  <td className="px-5 py-5 text-sm">
+                  <td className="px-5 py-5 text-base">
                     <strong className="text-foreground">
                       R$ {Math.max(0, 660 - index * 120)},00
                     </strong>
                   </td>
-                  <td className="px-5 py-5 text-sm text-muted-foreground">
+                  <td className="px-5 py-5 text-base text-muted-foreground">
                     {index === 0 ? 'Hoje' : `${index + 1} dias atrás`}
                   </td>
                 </tr>
@@ -234,7 +238,8 @@ export function Clientes() {
 
               <Button
                 type="submit"
-                className="mt-3"
+                size="lg"
+                className="mt-3 h-12 px-4 text-lg [&_svg:not([class*='size-'])]:size-4"
                 disabled={createClienteMutation.isPending}
               >
                 <FiPlus />{' '}

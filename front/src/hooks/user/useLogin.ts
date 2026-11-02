@@ -8,17 +8,13 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   token: string
-  usuario: {
-    id: string
-    nome: string
-    email: string
-  }
+  tipo: string
 }
 
 const login = async (payload: LoginPayload) => {
   const { data } = await api.post<LoginResponse>('/auth/login', payload)
   localStorage.setItem('token', data.token)
-  localStorage.setItem('usuario', JSON.stringify(data.usuario))
+  localStorage.setItem('tipoToken', data.tipo)
   return data
 }
 

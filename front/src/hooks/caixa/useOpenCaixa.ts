@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { api } from '../../services/api'
 import type { AbrirCaixaRequest, CaixaResponse } from './types'
 
@@ -14,8 +15,14 @@ export const useOpenCaixa = () => {
 
   return useMutation({
     mutationFn: openCaixa,
-    onSuccess: () => {
+    onSuccess: (caixa) => {
+      queryClient.setQueryData(['caixa', 'atual'], caixa)
       queryClient.invalidateQueries({ queryKey: ['caixa'] })
+    },
+    onError: (error) => {
+      if (error instanceof AxiosError && error.response?.status === 409) {
+        queryClient.invalidateQueries({ queryKey: ['caixa', 'atual'] })
+      }
     },
   })
 }

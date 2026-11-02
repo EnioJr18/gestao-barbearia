@@ -42,25 +42,29 @@ export function Login() {
       : mutation.error?.message
 
   const onSubmit = form.handleSubmit(async (values) => {
-    if (registering) {
-      if (!values.nome || values.nome.trim().length < 2) {
-        form.setError('nome', { message: 'Digite seu nome' })
+    try {
+      if (registering) {
+        if (!values.nome || values.nome.trim().length < 2) {
+          form.setError('nome', { message: 'Digite seu nome' })
+          return
+        }
+        await createUserMutation.mutateAsync({
+          nome: values.nome,
+          email: values.email,
+          senha: values.senha,
+        })
+        setRegistering(false)
+        form.reset({ nome: '', email: values.email, senha: '' })
         return
       }
-      await createUserMutation.mutateAsync({
-        nome: values.nome,
+      await loginMutation.mutateAsync({
         email: values.email,
         senha: values.senha,
       })
-      setRegistering(false)
-      form.reset({ nome: '', email: values.email, senha: '' })
+      navigate('/dashboard')
+    } catch {
       return
     }
-    await loginMutation.mutateAsync({
-      email: values.email,
-      senha: values.senha,
-    })
-    navigate('/dashboard')
   })
 
   const switchMode = () => {
@@ -228,7 +232,7 @@ function Field({
     <label className="block text-sm font-semibold text-[#29423d]">
       <span className="mb-2 block">{label}</span>
       <span className="relative block">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#78908a]">
+        <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-[#78908a]">
           {icon}
         </span>
         {children}
