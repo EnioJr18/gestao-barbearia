@@ -15,20 +15,23 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-const monthly = [
-  { month: 'Jan', value: 8200 },
-  { month: 'Fev', value: 10400 },
-  { month: 'Mar', value: 9700 },
-  { month: 'Abr', value: 12600 },
-  { month: 'Mai', value: 14100 },
-  { month: 'Jun', value: 18420 },
-]
-const ranking = [
-  { name: 'Lucas Andrade', value: 'R$ 660,00' },
-  { name: 'Rafael Moreira', value: 'R$ 420,00' },
-  { name: 'Caio Nascimento', value: 'R$ 310,00' },
-]
+import { useRelatorios } from '@/hooks/relatorio/useRelatorios'
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+    value,
+  )
+
 export function Relatorios() {
+  const year = new Date().getFullYear()
+  const dataInicial = `${year}-01-01`
+  const dataFinal = `${year}-12-31`
+  const { data, isLoading, error } = useRelatorios(dataInicial, dataFinal)
+  const monthly =
+    data?.itens.map((item) => ({
+      month: item.nome,
+      value: Number(item.faturamento),
+    })) ?? []
   return (
     <>
       <div className="welcome-row page-heading">
@@ -48,20 +51,26 @@ export function Relatorios() {
         <Stat
           icon={<FiDollarSign />}
           label="Faturamento no ano"
-          value="R$ 78.420"
+          value={formatCurrency(Number(data?.resumo.faturamento ?? 0))}
         />
-        <Stat icon={<FiUsers />} label="Clientes atendidos" value="486" />
+        <Stat
+          icon={<FiUsers />}
+          label="Vendas no período"
+          value={String(data?.resumo.quantidadeVendas ?? 0)}
+        />
         <Stat
           icon={<FiActivity />}
-          label="Serviço mais vendido"
-          value="Corte + barba"
+          label="Resultado no ano"
+          value={formatCurrency(Number(data?.resumo.resultado ?? 0))}
         />
       </div>
       <div className="content-grid">
         <Card className="chart-card">
           <CardHeader>
-            <CardTitle>Faturamento mensal</CardTitle>
-            <CardDescription>Comparativo de receita em 2026</CardDescription>
+            <CardTitle>Faturamento por item</CardTitle>
+            <CardDescription>
+              Itens com maior faturamento no período
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="chart-wrap large">
@@ -84,16 +93,26 @@ export function Relatorios() {
           </CardHeader>
           <CardContent>
             <div className="sales-list">
-              {ranking.map((item, index) => (
-                <div className="sale-row" key={item.name}>
+              {(data?.clientes ?? []).slice(0, 5).map((item, index) => (
+                <div className="sale-row" key={item.clienteId}>
                   <div className="small-avatar">{index + 1}</div>
                   <div className="sale-info">
-                    <strong>{item.name}</strong>
-                    <span>{12 - index * 3} pedidos no período</span>
+                    <strong>{item.nome}</strong>
+                    <span>{item.quantidadeVendas} pedidos no período</span>
                   </div>
-                  <b>{item.value}</b>
+                  <b>{formatCurrency(Number(item.valorTotal))}</b>
                 </div>
               ))}
+              {isLoading && (
+                <p className="text-sm text-muted-foreground">
+                  Carregando relatório...
+                </p>
+              )}
+              {error && (
+                <p className="text-sm text-red-600">
+                  Não foi possível carregar o relatório.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

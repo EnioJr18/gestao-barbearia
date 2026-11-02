@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,26 +7,60 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useAllClientes } from '@/hooks/cliente/useAllClientes'
+import { useCreateCliente } from '@/hooks/cliente/useCreateCliente'
+
 const schema = z.object({
-  name: z.string().min(3, 'Informe o nome'),
-  phone: z.string().min(8, 'Informe o telefone'),
+  nome: z.string().min(3, 'Informe o nome'),
+  telefone: z
+    .string()
+    .min(8, 'Informe o telefone')
+    .optional()
+    .or(z.literal('')),
 })
-type Client = z.infer<typeof schema>
-const seed: Client[] = [
-  { name: 'Lucas Andrade', phone: '(11) 98842-1022' },
-  { name: 'Rafael Moreira', phone: '(11) 99731-4402' },
-  { name: 'Caio Nascimento', phone: '(11) 99102-7731' },
-  { name: 'Bruno Tavares', phone: '(11) 98421-8890' },
-]
+
+type ClienteForm = z.infer<typeof schema>
+
 export function Clientes() {
-  const [clients, setClients] = useState(seed)
   const [modal, setModal] = useState(false)
-  const form = useForm<Client>({ resolver: zodResolver(schema) })
-  const submit = (data: Client) => {
-    setClients([...clients, data])
-    form.reset()
-    setModal(false)
+  const [buscar, setBuscar] = useState('')
+  const { data: clientes = [], isLoading } = useAllClientes()
+  const createClienteMutation = useCreateCliente()
+
+  const filteredClientes = useMemo(() => {
+    const value = buscar.trim().toLowerCase()
+    if (!value) return clientes
+
+    return clientes.filter(
+      (cliente) =>
+        cliente.nome.toLowerCase().includes(value) ||
+        (cliente.telefone ?? '').toLowerCase().includes(value),
+    )
+  }, [clientes, buscar])
+
+  const form = useForm<ClienteForm>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      nome: '',
+      telefone: '',
+    },
+  })
+
+  const submit = (data: ClienteForm) => {
+    createClienteMutation.mutate(
+      {
+        nome: data.nome,
+        telefone: data.telefone?.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          form.reset()
+          setModal(false)
+        },
+      },
+    )
   }
+
   return (
     <>
       <div className="mb-8 flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
@@ -41,7 +75,11 @@ export function Clientes() {
             Conheça quem mantém sua cadeira em movimento.
           </p>
         </div>
-        <Button onClick={() => setModal(true)}>
+        <Button
+          size="lg"
+          className="h-10 px-4 text-sm [&_svg:not([class*='size-'])]:size-4"
+          onClick={() => setModal(true)}
+        >
           <FiPlus /> Novo cliente
         </Button>
       </div>
@@ -49,67 +87,93 @@ export function Clientes() {
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
             <FiSearch />
-            <input placeholder="Buscar cliente" />
+            <input
+              placeholder="Buscar cliente"
+              value={buscar}
+              onChange={(event) => setBuscar(event.target.value)}
+              className="w-full border-0 bg-transparent text-lg outline-none"
+            />
           </div>
           <span className="text-sm text-muted-foreground">
-            {clients.length} clientes cadastrados
+            {filteredClientes.length} clientes cadastrados
           </span>
         </div>
-        <table className="w-full min-w-[700px] border-collapse">
+        <table className="w-full min-w-[700px] border-collapse text-lg [&_td]:text-lg [&_th]:text-sm">
           <thead className="bg-muted/40">
             <tr>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 CLIENTE
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 TELEFONE
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 VISITAS
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 TOTAL GASTO
               </th>
-              <th className="px-5 py-4 text-left text-[11px] font-bold tracking-wider text-muted-foreground">
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 ÚLTIMA VISITA
               </th>
             </tr>
           </thead>
           <tbody>
-            {clients.map((client, index) => (
-              <tr
-                className="border-b transition-colors hover:bg-muted/25 last:border-0"
-                key={client.name}
-              >
-                <td>
-                  <div className="flex items-center gap-3">
-                    <div className="grid size-8 place-items-center rounded-full bg-emerald-100 text-[10px] font-bold text-primary">
-                      {client.name
-                        .split(' ')
-                        .map((part) => part[0])
-                        .join('')}
-                    </div>
-                    <strong className="text-sm text-foreground">
-                      {client.name}
-                    </strong>
-                  </div>
-                </td>
-                <td className="px-5 py-5 text-sm text-muted-foreground">
-                  {client.phone}
-                </td>
-                <td className="px-5 py-5 text-sm text-muted-foreground">
-                  {12 - index}
-                </td>
-                <td className="px-5 py-5 text-sm">
-                  <strong className="text-foreground">
-                    R$ {660 - index * 120},00
-                  </strong>
-                </td>
-                <td className="px-5 py-5 text-sm text-muted-foreground">
-                  {index === 0 ? 'Hoje' : `${index + 1} dias atrás`}
+            {isLoading ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-5 py-8 text-center text-sm text-muted-foreground"
+                >
+                  Carregando clientes...
                 </td>
               </tr>
-            ))}
+            ) : filteredClientes.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-5 py-8 text-center text-sm text-muted-foreground"
+                >
+                  Nenhum cliente encontrado.
+                </td>
+              </tr>
+            ) : (
+              filteredClientes.map((cliente, index) => (
+                <tr
+                  className="border-b transition-colors hover:bg-muted/25 last:border-0"
+                  key={cliente.id}
+                >
+                  <td>
+                    <div className="flex items-center gap-3 px-5 py-5">
+                      <div className="grid size-8 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-primary">
+                        {cliente.nome
+                          .split(' ')
+                          .map((part) => part[0])
+                          .join('')
+                          .slice(0, 2)}
+                      </div>
+                      <strong className="text-sm text-foreground">
+                        {cliente.nome}
+                      </strong>
+                    </div>
+                  </td>
+                  <td className="px-5 py-5 text-base text-muted-foreground">
+                    {cliente.telefone || '—'}
+                  </td>
+                  <td className="px-5 py-5 text-base text-muted-foreground">
+                    {12 - index}
+                  </td>
+                  <td className="px-5 py-5 text-base">
+                    <strong className="text-foreground">
+                      R$ {Math.max(0, 660 - index * 120)},00
+                    </strong>
+                  </td>
+                  <td className="px-5 py-5 text-base text-muted-foreground">
+                    {index === 0 ? 'Hoje' : `${index + 1} dias atrás`}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </Card>
@@ -119,7 +183,7 @@ export function Clientes() {
           onMouseDown={() => setModal(false)}
         >
           <div
-            className="relative w-full max-w-md rounded-xl bg-background p-7 shadow-xl"
+            className="relative w-full max-w-xl rounded-xl bg-background p-8 shadow-xl"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <button
@@ -133,27 +197,55 @@ export function Clientes() {
                 <FiUser />
               </div>
               <div>
-                <h2 className="font-heading text-xl font-bold">Novo cliente</h2>
-                <p className="text-xs text-muted-foreground">
+                <h2 className="font-heading text-3xl font-bold">
+                  Novo cliente
+                </h2>
+                <p className="text-md text-muted-foreground">
                   Cadastre um cliente para acompanhar seu histórico.
                 </p>
               </div>
             </div>
             <form className="grid gap-2" onSubmit={form.handleSubmit(submit)}>
-              <Label htmlFor="client-name">Nome completo</Label>
+              <Label className="text-md" htmlFor="client-name">
+                Nome completo
+              </Label>
               <Input
                 id="client-name"
                 placeholder="Ex.: João da Silva"
-                {...form.register('name')}
+                className="h-12 text-lg placeholder:text-lg"
+                {...form.register('nome')}
               />
-              <Label htmlFor="client-phone">Telefone</Label>
+              {form.formState.errors.nome && (
+                <span className="text-xs text-red-600">
+                  {form.formState.errors.nome.message}
+                </span>
+              )}
+
+              <Label className="text-lg" htmlFor="client-phone">
+                Telefone
+              </Label>
               <Input
                 id="client-phone"
                 placeholder="(11) 99999-9999"
-                {...form.register('phone')}
+                className="h-12 text-lg placeholder:text-lg"
+                {...form.register('telefone')}
               />
-              <Button type="submit" className="mt-3">
-                <FiPlus /> Cadastrar cliente
+              {form.formState.errors.telefone && (
+                <span className="text-xs text-red-600">
+                  {form.formState.errors.telefone.message}
+                </span>
+              )}
+
+              <Button
+                type="submit"
+                size="lg"
+                className="mt-3 h-12 px-4 text-lg [&_svg:not([class*='size-'])]:size-4"
+                disabled={createClienteMutation.isPending}
+              >
+                <FiPlus />{' '}
+                {createClienteMutation.isPending
+                  ? 'Cadastrando...'
+                  : 'Cadastrar cliente'}
               </Button>
             </form>
           </div>

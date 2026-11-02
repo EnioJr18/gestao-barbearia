@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   FiActivity,
   FiBarChart2,
   FiBox,
   FiGrid,
+  FiLogOut,
   FiShoppingBag,
   FiUsers,
 } from 'react-icons/fi'
@@ -23,7 +24,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
-import { Separator } from '@/components/ui/separator'
+import { useMeUser } from '@/hooks/user/useMeUser'
 
 const links = [
   { to: '/dashboard', label: 'Visão geral', icon: FiGrid },
@@ -33,22 +34,44 @@ const links = [
   { to: '/relatorios', label: 'Relatórios', icon: FiBarChart2 },
 ]
 
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+
+  return initials.toUpperCase() || 'U'
+}
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { data: user } = useMeUser()
   const current = links.find((link) => link.to === location.pathname)
+  const userName = user?.nome ?? 'Usuário'
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('tipoToken')
+    navigate('/login', { replace: true })
+  }
+
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 px-2 py-3">
+          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
             <div className="grid size-8 shrink-0 place-items-center rounded-lg rounded-bl-sm bg-primary font-heading text-lg font-bold text-primary-foreground">
               C
             </div>
             <div className="group-data-[collapsible=icon]:hidden">
-              <strong className="font-heading text-base">
+              <strong className="font-heading text-xl">
                 Corte <span className="text-amber-600">& Cia</span>
               </strong>
-              <span className="block text-[10px] text-muted-foreground">
+              <span className="block text-sm text-muted-foreground">
                 gestão inteligente
               </span>
             </div>
@@ -56,7 +79,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-semibold tracking-wide">
+            <SidebarGroupLabel className="text-sm font-semibold tracking-wide">
               MENU PRINCIPAL
             </SidebarGroupLabel>
             <SidebarMenu>
@@ -66,15 +89,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                     render={<NavLink to={to} />}
                     isActive={current?.to === to}
                     tooltip={label}
-                    className="text-sm [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:[&>svg]:size-4"
+                    className="justify-start text-base [&_svg]:size-5 group-data-[collapsible=icon]:justify-center"
                   >
-                    <>
+                    <span className="flex size-5 shrink-0 items-center justify-center">
                       <Icon />
-                      <span>{label}</span>
-                      {to === '/produtos' && (
-                        <span className="ml-auto text-[10px]">4</span>
-                      )}
-                    </>
+                    </span>
+                    <span className="group-data-[collapsible=icon]:hidden">
+                      {label}
+                    </span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -82,26 +104,46 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </SidebarGroup>
           <SidebarGroup className="mt-auto group-data-[collapsible=icon]:hidden">
             <div className="grid gap-1 rounded-lg bg-amber-50 p-3 text-amber-950">
-              <FiActivity className="text-amber-600" />
-              <strong className="text-xs">Seu negócio em movimento</strong>
-              <span className="text-[10px] leading-4 text-amber-800/70">
+              <FiActivity className="size-5 text-amber-600" />
+              <strong className="text-sm">Seu negócio em movimento</strong>
+              <span className="text-xs leading-4 text-amber-800/70">
                 Acompanhe seus resultados todos os dias.
               </span>
             </div>
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <SidebarMenu>
+          <SidebarMenu className="gap-2">
             <SidebarMenuItem>
-              <SidebarMenuButton className="text-sm [&_svg]:size-5">
+              <SidebarMenuButton
+                size="lg"
+                className="justify-start gap-3 text-base [&_svg]:size-5 group-data-[collapsible=icon]:justify-center"
+              >
                 <div className="grid size-7 shrink-0 place-items-center rounded-full bg-emerald-100 text-[10px] font-bold text-primary">
-                  MS
+                  {getInitials(userName)}
                 </div>
-                <span>
-                  <strong className="block text-xs">Marcos Silva</strong>
-                  <small className="text-[10px] text-muted-foreground">
+                <span className="min-w-0 group-data-[collapsible=icon]:hidden">
+                  <strong className="block whitespace-nowrap text-sm">
+                    {userName}
+                  </strong>
+                  <small className="text-xs text-muted-foreground">
                     Administrador
                   </small>
+                </span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                type="button"
+                onClick={handleLogout}
+                className="justify-start text-base text-red-700 hover:bg-red-50 hover:text-red-800 [&_svg]:size-5 group-data-[collapsible=icon]:justify-center"
+                tooltip="Sair"
+              >
+                <span className="flex size-5 shrink-0 items-center justify-center">
+                  <FiLogOut />
+                </span>
+                <span className="group-data-[collapsible=icon]:hidden">
+                  Sair
                 </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -110,29 +152,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-background px-4 md:px-8">
+        <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
           <SidebarTrigger
-            className="size-9 [&_svg]:size-5"
+            className="size-10 [&_svg]:size-5 m-3 text-2xl"
             aria-label="Abrir ou fechar menu"
           />
-          <Separator orientation="vertical" className="h-5" />
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Workspace</span>
-            <span>/</span>
-            <strong className="text-foreground">
-              {current?.label ?? 'Visão geral'}
-            </strong>
-          </div>
-          <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            <span className="hidden sm:inline">Operação aberta</span>
-            <div className="grid size-7 place-items-center rounded-full bg-emerald-100 text-[10px] font-bold text-primary">
-              MS
-            </div>
-          </div>
-        </header>
-        <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
-          <div className="mx-auto w-full max-w-[1600px] p-4 md:px-10 md:py-8 xl:px-14">
+          <div className="mx-auto w-full p-4 md:px-15 md:py-5 xl:px-30">
             {children}
           </div>
         </main>
