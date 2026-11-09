@@ -2,7 +2,7 @@
 
 @layer base {
   body {
-    @apply min-w-0 text-sm;
+    @apply min-w-0 text-base;
   }
   button {
     @apply cursor-pointer;

@@ -5,6 +5,9 @@ export interface ClienteResponse {
   ativo: boolean
   createdAt: string
   updatedAt: string
+  visitas: number
+  totalGasto: number
+  ultimaVisita: string | null
 }
 
 export interface CriarClienteRequest {

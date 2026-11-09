@@ -18,6 +18,24 @@ export interface CriarItemRequest {
   estoque?: number | null
 }
 
+export interface CriarProdutoRequest {
+  nome: string
+  preco: number
+  estoque: number
+}
+
+export interface CriarServicoRequest {
+  nome: string
+  preco: number
+}
+
+export interface AtualizarItemRequest {
+  nome: string
+  tipo: TipoItem
+  preco: number
+  estoque: number | null
+}
+
 export interface ListItensParams {
   tipo?: TipoItem
   ativo?: boolean

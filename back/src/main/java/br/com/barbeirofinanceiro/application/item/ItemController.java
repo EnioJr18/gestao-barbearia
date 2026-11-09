@@ -27,6 +27,20 @@ public class ItemController {
                 .body(ItemResponse.from(item));
     }
 
+    @PostMapping("/produtos")
+    public ResponseEntity<ItemResponse> criarProduto(@Valid @RequestBody CriarProdutoRequest request) {
+        Item item = itemService.criarProduto(request);
+        return ResponseEntity.created(URI.create("/api/v1/itens/" + item.getId()))
+                .body(ItemResponse.from(item));
+    }
+
+    @PostMapping("/servicos")
+    public ResponseEntity<ItemResponse> criarServico(@Valid @RequestBody CriarServicoRequest request) {
+        Item item = itemService.criarServico(request);
+        return ResponseEntity.created(URI.create("/api/v1/itens/" + item.getId()))
+                .body(ItemResponse.from(item));
+    }
+
     @GetMapping
     public List<ItemResponse> listar(
             @RequestParam(required = false) TipoItem tipo,
@@ -44,6 +58,12 @@ public class ItemController {
     @PutMapping("/{id}")
     public ItemResponse atualizar(@PathVariable UUID id, @Valid @RequestBody AtualizarItemRequest request) {
         return ItemResponse.from(itemService.atualizar(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+        itemService.excluir(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/ativar")

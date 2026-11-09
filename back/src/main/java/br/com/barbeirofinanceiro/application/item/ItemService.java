@@ -24,14 +24,28 @@ public class ItemService {
 
     @Transactional
     public Item criar(CriarItemRequest request) {
-        validarEstoque(request.tipo(), request.estoque());
-        validarNomeDisponivel(request.nome(), null);
+        return criar(request.nome(), request.preco(), request.tipo(), request.estoque());
+    }
+
+    @Transactional
+    public Item criarProduto(CriarProdutoRequest request) {
+        return criar(request.nome(), request.preco(), TipoItem.PRODUTO, request.estoque());
+    }
+
+    @Transactional
+    public Item criarServico(CriarServicoRequest request) {
+        return criar(request.nome(), request.preco(), TipoItem.SERVICO, null);
+    }
+
+    private Item criar(String nome, java.math.BigDecimal preco, TipoItem tipo, Integer estoque) {
+        validarEstoque(tipo, estoque);
+        validarNomeDisponivel(nome, null);
 
         Item item = new Item();
-        item.setNome(normalizarNome(request.nome()));
-        item.setTipo(request.tipo());
-        item.setPreco(request.preco());
-        item.setEstoque(request.estoque());
+        item.setNome(normalizarNome(nome));
+        item.setTipo(tipo);
+        item.setPreco(preco);
+        item.setEstoque(estoque);
         return salvar(item);
     }
 
@@ -61,16 +75,12 @@ public class ItemService {
     @Transactional
     public Item atualizar(UUID id, AtualizarItemRequest request) {
         Item item = buscar(id);
-        if (request.tipo() == TipoItem.SERVICO && item.getEstoque() != null) {
-            throw new ItemConflictException("Não é possível transformar produto com estoque em serviço");
-        }
-        if (request.tipo() == TipoItem.PRODUTO && item.getEstoque() == null) {
-            throw new ItemValidationException("Produto deve possuir estoque");
-        }
+        validarEstoque(request.tipo(), request.estoque());
         validarNomeDisponivel(request.nome(), id);
         item.setNome(normalizarNome(request.nome()));
         item.setTipo(request.tipo());
         item.setPreco(request.preco());
+        item.setEstoque(request.estoque());
         return salvar(item);
     }
 
@@ -79,6 +89,17 @@ public class ItemService {
         Item item = buscar(id);
         item.setAtivo(ativo);
         return itemRepository.saveAndFlush(item);
+    }
+
+    @Transactional
+    public void excluir(UUID id) {
+        Item item = buscar(id);
+        try {
+            itemRepository.delete(item);
+            itemRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new ItemConflictException("Item possui pedidos vinculados e não pode ser excluído");
+        }
     }
 
     private void validarEstoque(TipoItem tipo, Integer estoque) {

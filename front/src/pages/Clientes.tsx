@@ -2,13 +2,18 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { FiPlus, FiSearch, FiUser, FiX } from 'react-icons/fi'
+import { FiEdit2, FiPlus, FiSearch, FiTrash2, FiUser, FiX } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useAllClientes } from '@/hooks/cliente/useAllClientes'
 import { useCreateCliente } from '@/hooks/cliente/useCreateCliente'
+import { useUpdateCliente } from '@/hooks/cliente/useUpdateCliente'
+import { useDeleteCliente } from '@/hooks/cliente/useDeleteCliente'
+import { useActiveCliente } from '@/hooks/cliente/useActiveCliente'
+import { useInactiveCliente } from '@/hooks/cliente/useInactiveCliente'
 
 const schema = z.object({
   nome: z.string().min(3, 'Informe o nome'),
@@ -21,11 +26,23 @@ const schema = z.object({
 
 type ClienteForm = z.infer<typeof schema>
 
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 2) return digits.length ? `(${digits}` : ''
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
+}
+
 export function Clientes() {
   const [modal, setModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [buscar, setBuscar] = useState('')
   const { data: clientes = [], isLoading } = useAllClientes()
   const createClienteMutation = useCreateCliente()
+  const updateClienteMutation = useUpdateCliente()
+  const deleteClienteMutation = useDeleteCliente()
+  const activeClienteMutation = useActiveCliente()
+  const inactiveClienteMutation = useInactiveCliente()
 
   const filteredClientes = useMemo(() => {
     const value = buscar.trim().toLowerCase()
@@ -45,20 +62,19 @@ export function Clientes() {
       telefone: '',
     },
   })
+  const phoneField = form.register('telefone')
 
   const submit = (data: ClienteForm) => {
-    createClienteMutation.mutate(
-      {
-        nome: data.nome,
-        telefone: data.telefone?.trim() || null,
-      },
-      {
-        onSuccess: () => {
-          form.reset()
-          setModal(false)
-        },
-      },
-    )
+    const payload = { nome: data.nome, telefone: data.telefone?.trim() || null }
+    const options = { onSuccess: () => { form.reset(); setModal(false); setEditingId(null) } }
+    if (editingId) updateClienteMutation.mutate({ id: editingId, payload }, options)
+    else createClienteMutation.mutate(payload, options)
+  }
+
+  const editCliente = (cliente: (typeof clientes)[number]) => {
+    setEditingId(cliente.id)
+    form.reset({ nome: cliente.nome, telefone: formatPhone(cliente.telefone ?? '') })
+    setModal(true)
   }
 
   return (
@@ -78,20 +94,20 @@ export function Clientes() {
         <Button
           size="lg"
           className="h-10 px-4 text-sm [&_svg:not([class*='size-'])]:size-4"
-          onClick={() => setModal(true)}
+          onClick={() => { setEditingId(null); form.reset(); setModal(true) }}
         >
           <FiPlus /> Novo cliente
         </Button>
       </div>
       <Card className="overflow-hidden rounded-xl border shadow-sm">
-        <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 sm:flex-row sm:items-center">
-          <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+        <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
+          <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
             <FiSearch />
             <input
               placeholder="Buscar cliente"
               value={buscar}
               onChange={(event) => setBuscar(event.target.value)}
-              className="w-full border-0 bg-transparent text-lg outline-none"
+              className="w-full bg-transparent text-lg outline-none"
             />
           </div>
           <span className="text-sm text-muted-foreground">
@@ -116,13 +132,15 @@ export function Clientes() {
               <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">
                 ÚLTIMA VISITA
               </th>
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">STATUS</th>
+              <th className="px-5 py-4 text-left text-sm font-bold tracking-wider text-muted-foreground">AÇÕES</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="px-5 py-8 text-center text-sm text-muted-foreground"
                 >
                   Carregando clientes...
@@ -131,14 +149,14 @@ export function Clientes() {
             ) : filteredClientes.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="px-5 py-8 text-center text-sm text-muted-foreground"
                 >
                   Nenhum cliente encontrado.
                 </td>
               </tr>
             ) : (
-              filteredClientes.map((cliente, index) => (
+              filteredClientes.map((cliente) => (
                 <tr
                   className="border-b transition-colors hover:bg-muted/25 last:border-0"
                   key={cliente.id}
@@ -152,7 +170,7 @@ export function Clientes() {
                           .join('')
                           .slice(0, 2)}
                       </div>
-                      <strong className="text-sm text-foreground">
+                      <strong className="text-lg text-foreground">
                         {cliente.nome}
                       </strong>
                     </div>
@@ -161,15 +179,36 @@ export function Clientes() {
                     {cliente.telefone || '—'}
                   </td>
                   <td className="px-5 py-5 text-base text-muted-foreground">
-                    {12 - index}
+                    {cliente.visitas}
                   </td>
                   <td className="px-5 py-5 text-base">
                     <strong className="text-foreground">
-                      R$ {Math.max(0, 660 - index * 120)},00
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(cliente.totalGasto))}
                     </strong>
                   </td>
                   <td className="px-5 py-5 text-base text-muted-foreground">
-                    {index === 0 ? 'Hoje' : `${index + 1} dias atrás`}
+                    {cliente.ultimaVisita
+                      ? new Intl.DateTimeFormat('pt-BR').format(new Date(`${cliente.ultimaVisita}T00:00:00`))
+                      : '—'}
+                  </td>
+                  <td className="px-5 py-5">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={cliente.ativo}
+                        aria-label={`${cliente.ativo ? 'Desativar' : 'Ativar'} cliente ${cliente.nome}`}
+                        onCheckedChange={(checked) => checked
+                          ? activeClienteMutation.mutate(cliente.id)
+                          : inactiveClienteMutation.mutate(cliente.id)}
+                        disabled={activeClienteMutation.isPending || inactiveClienteMutation.isPending}
+                      />
+                      <span className="text-lg text-muted-foreground">{cliente.ativo ? 'Ativo' : 'Inativo'}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-5">
+                    <div className="flex items-center gap-2">
+                      <button type="button" title="Editar" aria-label="Editar cliente" onClick={() => editCliente(cliente)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-amber-500/15 hover:text-amber-300"><FiEdit2 /></button>
+                      <button type="button" title="Excluir" aria-label="Excluir cliente" disabled={deleteClienteMutation.isPending} onClick={() => window.confirm(`Excluir ${cliente.nome}?`) && deleteClienteMutation.mutate(cliente.id)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"><FiTrash2 /></button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -198,7 +237,7 @@ export function Clientes() {
               </div>
               <div>
                 <h2 className="font-heading text-3xl font-bold">
-                  Novo cliente
+                  {editingId ? 'Editar cliente' : 'Novo cliente'}
                 </h2>
                 <p className="text-md text-muted-foreground">
                   Cadastre um cliente para acompanhar seu histórico.
@@ -228,7 +267,11 @@ export function Clientes() {
                 id="client-phone"
                 placeholder="(11) 99999-9999"
                 className="h-12 text-lg placeholder:text-lg"
-                {...form.register('telefone')}
+                {...phoneField}
+                onChange={(event) => {
+                  event.target.value = formatPhone(event.target.value)
+                  phoneField.onChange(event)
+                }}
               />
               {form.formState.errors.telefone && (
                 <span className="text-xs text-red-600">
@@ -242,10 +285,8 @@ export function Clientes() {
                 className="mt-3 h-12 px-4 text-lg [&_svg:not([class*='size-'])]:size-4"
                 disabled={createClienteMutation.isPending}
               >
-                <FiPlus />{' '}
-                {createClienteMutation.isPending
-                  ? 'Cadastrando...'
-                  : 'Cadastrar cliente'}
+                <FiPlus /> {createClienteMutation.isPending || updateClienteMutation.isPending
+                  ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Cadastrar cliente'}
               </Button>
             </form>
           </div>
