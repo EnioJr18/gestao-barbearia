@@ -11,6 +11,7 @@ public record AtualizarItemRequest(
         @NotBlank(message = "nome é obrigatório") String nome,
         @NotNull(message = "tipo é obrigatório") TipoItem tipo,
         @NotNull(message = "preco é obrigatório")
-        @DecimalMin(value = "0.00", message = "preco deve ser maior ou igual a zero") BigDecimal preco
+        @DecimalMin(value = "0.00", message = "preco deve ser maior ou igual a zero") BigDecimal preco,
+        @DecimalMin(value = "0", message = "estoque deve ser maior ou igual a zero") Integer estoque
 ) {
 }

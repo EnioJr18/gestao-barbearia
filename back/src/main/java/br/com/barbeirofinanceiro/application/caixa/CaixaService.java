@@ -7,6 +7,7 @@ import br.com.barbeirofinanceiro.domain.usuario.Usuario;
 import br.com.barbeirofinanceiro.domain.usuario.UsuarioRepository;
 import br.com.barbeirofinanceiro.domain.movimentacao.MovimentacaoRepository;
 import br.com.barbeirofinanceiro.domain.venda.VendaPagamentoRepository;
+import br.com.barbeirofinanceiro.domain.movimentacao.FormaPagamento;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import java.util.Optional;
+import java.util.List;
 
 @Service
 public class CaixaService {
@@ -82,6 +84,13 @@ public class CaixaService {
                 .map(this::resposta);
     }
 
+    @Transactional(readOnly = true)
+    public List<CaixaResponse> listarComResposta() {
+        return caixaRepository.findAllByOrderByDataCaixaDesc().stream()
+                .map(this::resposta)
+                .toList();
+    }
+
     @Transactional
     public Caixa fechar(UUID id, BigDecimal valorApurado, Authentication authentication) {
         return fecharCaixa(id, valorApurado, authentication);
@@ -130,10 +139,38 @@ public class CaixaService {
     private CaixaResponse resposta(Caixa caixa) {
         BigDecimal entradas = entradasDinheiro(caixa);
         BigDecimal saidas = saidasDinheiro(caixa);
+        BigDecimal dinheiro = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
+                caixa.getId(), FormaPagamento.DINHEIRO);
+        BigDecimal pix = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
+                caixa.getId(), FormaPagamento.PIX);
+        BigDecimal debito = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
+                caixa.getId(), FormaPagamento.CARTAO_DEBITO);
+        BigDecimal credito = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
+                caixa.getId(), FormaPagamento.CARTAO_CREDITO);
         BigDecimal valorEsperado = caixa.getStatus() == StatusCaixa.FECHADO
                 ? caixa.getValorApurado().subtract(caixa.getDiferenca())
                 : caixa.getValorInicial().add(entradas).subtract(saidas);
-        return CaixaResponse.from(caixa, entradas, saidas, valorEsperado);
+        return new CaixaResponse(
+                caixa.getId(),
+                caixa.getDataCaixa(),
+                caixa.getValorInicial(),
+                entradas,
+                saidas,
+                dinheiro,
+                pix,
+                debito,
+                credito,
+                valorEsperado,
+                caixa.getValorApurado(),
+                caixa.getDiferenca(),
+                caixa.getStatus(),
+                caixa.getUsuarioAbertura().getId(),
+                caixa.getUsuarioFechamento() == null ? null : caixa.getUsuarioFechamento().getId(),
+                caixa.getAbertoEm(),
+                caixa.getFechadoEm(),
+                caixa.getCreatedAt(),
+                caixa.getUpdatedAt()
+        );
     }
 
     private Usuario resolveAuthenticatedUser(Authentication authentication) {

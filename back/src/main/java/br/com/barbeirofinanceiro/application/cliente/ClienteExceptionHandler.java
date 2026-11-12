@@ -13,4 +13,9 @@ public class ClienteExceptionHandler {
     ResponseEntity<Map<String, String>> notFound(ClienteNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", exception.getMessage()));
     }
+
+    @ExceptionHandler(ClienteConflictException.class)
+    ResponseEntity<Map<String, String>> conflict(ClienteConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", exception.getMessage()));
+    }
 }

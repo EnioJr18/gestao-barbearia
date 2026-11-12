@@ -6,6 +6,10 @@ export interface CaixaResponse {
   valorInicial: number
   entradasDinheiro: number
   saidasDinheiro: number
+  dinheiro: number
+  pix: number
+  debito: number
+  credito: number
   valorEsperado: number
   valorApurado: number
   diferenca: number

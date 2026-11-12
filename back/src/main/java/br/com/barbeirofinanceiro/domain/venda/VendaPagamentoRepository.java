@@ -28,6 +28,18 @@ public interface VendaPagamentoRepository extends JpaRepository<VendaPagamento, 
     BigDecimal sumDinheiroByCaixaId(@Param("caixaId") UUID caixaId);
 
     @Query("""
+        SELECT COALESCE(SUM(p.valor), 0)
+        FROM VendaPagamento p
+        WHERE p.venda.caixa.id = :caixaId
+          AND p.venda.status = br.com.barbeirofinanceiro.domain.venda.StatusVenda.FINALIZADA
+          AND p.formaPagamento = :formaPagamento
+        """)
+    BigDecimal sumByCaixaIdAndFormaPagamento(
+            @Param("caixaId") UUID caixaId,
+            @Param("formaPagamento") FormaPagamento formaPagamento
+    );
+
+    @Query("""
         SELECT new br.com.barbeirofinanceiro.domain.venda.PagamentoResumoProjection(
             p.formaPagamento,
             COALESCE(SUM(p.valor), 0)

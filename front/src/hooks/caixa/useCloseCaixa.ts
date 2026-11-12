@@ -24,6 +24,7 @@ export const useCloseCaixa = () => {
     onSuccess: async () => {
       queryClient.setQueryData(['caixa', 'atual'], null)
       await queryClient.invalidateQueries({ queryKey: ['caixa'] })
+      await queryClient.invalidateQueries({ queryKey: ['caixa', 'historico'] })
     },
   })
 }

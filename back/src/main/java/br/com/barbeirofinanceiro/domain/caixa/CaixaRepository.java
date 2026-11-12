@@ -7,10 +7,13 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface CaixaRepository extends JpaRepository<Caixa, UUID> {
     Optional<Caixa> findFirstByStatusOrderByDataCaixaDesc(StatusCaixa status);
+
+    List<Caixa> findAllByOrderByDataCaixaDesc();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Caixa c where c.status = br.com.barbeirofinanceiro.domain.caixa.StatusCaixa.ABERTO order by c.dataCaixa desc")

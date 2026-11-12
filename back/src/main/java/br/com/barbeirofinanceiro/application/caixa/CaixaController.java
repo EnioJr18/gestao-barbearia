@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/caixas")
@@ -35,6 +36,11 @@ public class CaixaController {
         return caixaService.atualComRespostaOpcional()
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.<CaixaResponse>noContent().build());
+    }
+
+    @GetMapping("/historico")
+    public List<CaixaResponse> listar() {
+        return caixaService.listarComResposta();
     }
 
     @PostMapping("/{id}/fechar")
