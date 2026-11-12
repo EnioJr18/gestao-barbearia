@@ -4,18 +4,21 @@ import br.com.barbeirofinanceiro.domain.item.Item;
 import br.com.barbeirofinanceiro.domain.item.ItemRepository;
 import br.com.barbeirofinanceiro.domain.item.TipoItem;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
-
 @Service
 public class ItemService {
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final ItemRepository itemRepository;
 
     public ItemService(ItemRepository itemRepository) {
@@ -36,7 +39,9 @@ public class ItemService {
     }
 
     @Transactional(readOnly = true)
-    public List<Item> listar(TipoItem tipo, Boolean ativo, String nome) {
+    public Page<Item> listar(TipoItem tipo, Boolean ativo, String nome, int page, int size) {
+        validarPaginacao(page, size);
+
         Specification<Item> specification = (root, query, builder) -> builder.conjunction();
         if (tipo != null) {
             specification = specification.and((root, query, builder) -> builder.equal(root.get("tipo"), tipo));
@@ -49,7 +54,20 @@ public class ItemService {
             specification = specification.and((root, query, builder) ->
                     builder.like(builder.lower(root.get("nome")), termo));
         }
-        return itemRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "nome"));
+        Sort sort = Sort.by(Sort.Direction.ASC, "nome");
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Item> resultado = itemRepository.findAll(specification, pageable);
+
+        if (resultado.getTotalElements() == 0) {
+            return Page.empty(PageRequest.of(0, size, sort));
+        }
+
+        if (page >= resultado.getTotalPages()) {
+            int ultimaPagina = resultado.getTotalPages() - 1;
+            return itemRepository.findAll(specification, PageRequest.of(ultimaPagina, size, sort));
+        }
+
+        return resultado;
     }
 
     @Transactional(readOnly = true)
@@ -108,5 +126,14 @@ public class ItemService {
 
     private String normalizarNome(String nome) {
         return nome.trim();
+    }
+
+    private void validarPaginacao(int page, int size) {
+        if (page < 0) {
+            throw new ItemValidationException("page deve ser maior ou igual a zero");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ItemValidationException("size deve estar entre 1 e " + MAX_PAGE_SIZE);
+        }
     }
 }

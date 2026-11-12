@@ -1,14 +1,14 @@
 package br.com.barbeirofinanceiro.application.item;
 
+import br.com.barbeirofinanceiro.application.common.PageResponse;
+import br.com.barbeirofinanceiro.application.common.PageResponseMapper;
 import br.com.barbeirofinanceiro.domain.item.Item;
 import br.com.barbeirofinanceiro.domain.item.TipoItem;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -28,12 +28,14 @@ public class ItemController {
     }
 
     @GetMapping
-    public List<ItemResponse> listar(
+    public PageResponse<ItemResponse> listar(
             @RequestParam(required = false) TipoItem tipo,
             @RequestParam(required = false) Boolean ativo,
-            @RequestParam(required = false) String nome
+            @RequestParam(required = false) String nome,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        return itemService.listar(tipo, ativo, nome).stream().map(ItemResponse::from).toList();
+        return PageResponseMapper.from(itemService.listar(tipo, ativo, nome, page, size), ItemResponse::from);
     }
 
     @GetMapping("/{id}")
