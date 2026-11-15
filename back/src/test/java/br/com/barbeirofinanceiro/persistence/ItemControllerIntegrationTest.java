@@ -28,6 +28,7 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -75,6 +76,31 @@ class ItemControllerIntegrationTest extends PostgresPersistenceTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tipo").value("PRODUTO"))
                 .andExpect(jsonPath("$.estoque").value(10));
+    }
+
+    @Test
+    void devePreservarContratosDosEndpointsEspecificosDeCriacao() throws Exception {
+        mockMvc.perform(post("/api/v1/itens/produtos")
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Cera\",\"preco\":25.00,\"estoque\":8}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tipo").value("PRODUTO"))
+                .andExpect(jsonPath("$.estoque").value(8));
+
+        mockMvc.perform(post("/api/v1/itens/servicos")
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Barba\",\"preco\":20.00}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tipo").value("SERVICO"))
+                .andExpect(jsonPath("$.estoque").doesNotExist());
+
+        mockMvc.perform(post("/api/v1/itens/produtos")
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Óleo\",\"preco\":30.00}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -154,17 +180,122 @@ class ItemControllerIntegrationTest extends PostgresPersistenceTest {
     }
 
     @Test
-    void deveInativarEAtivarItem() throws Exception {
+    void deveAtualizarEstoqueDoProdutoQuandoInformado() throws Exception {
+        UUID id = criar("Pomada", "PRODUTO", "35", 10);
+
+        mockMvc.perform(put("/api/v1/itens/{id}", id)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Pomada\",\"tipo\":\"PRODUTO\",\"preco\":35,\"estoque\":6}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estoque").value(6));
+
+        mockMvc.perform(get("/api/v1/itens/{id}", id).with(user(USERNAME)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estoque").value(6));
+    }
+
+    @Test
+    void deveRejeitarEstoqueNuloExplicitamenteNaAtualizacaoDeProduto() throws Exception {
+        UUID id = criar("Pomada", "PRODUTO", "35", 10);
+
+        mockMvc.perform(put("/api/v1/itens/{id}", id)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Pomada\",\"tipo\":\"PRODUTO\",\"preco\":35,\"estoque\":null}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/itens/{id}", id).with(user(USERNAME)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estoque").value(10));
+    }
+
+    @Test
+    void deveRejeitarEstoqueNegativoNaAtualizacao() throws Exception {
+        UUID id = criar("Pomada", "PRODUTO", "35", 10);
+
+        mockMvc.perform(put("/api/v1/itens/{id}", id)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Pomada\",\"tipo\":\"PRODUTO\",\"preco\":35,\"estoque\":-1}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveAtualizarServicoSemEstoqueERejeitarEstoqueInformado() throws Exception {
+        UUID id = criar("Corte", "SERVICO", "30", null);
+
+        mockMvc.perform(put("/api/v1/itens/{id}", id)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Corte Premium\",\"tipo\":\"SERVICO\",\"preco\":40}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Corte Premium"))
+                .andExpect(jsonPath("$.estoque").doesNotExist());
+
+        mockMvc.perform(put("/api/v1/itens/{id}", id)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Corte Premium\",\"tipo\":\"SERVICO\",\"preco\":40,\"estoque\":1}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void deveValidarEstoqueAoConverterEntreProdutoEServico() throws Exception {
+        UUID produto = criar("Pomada", "PRODUTO", "35", 10);
+        UUID servico = criar("Corte", "SERVICO", "30", null);
+
+        mockMvc.perform(put("/api/v1/itens/{id}", produto)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Pomada\",\"tipo\":\"SERVICO\",\"preco\":35}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/itens/{id}", servico)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Corte\",\"tipo\":\"PRODUTO\",\"preco\":30}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/itens/{id}", servico)
+                        .with(csrf()).with(user(USERNAME))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Corte\",\"tipo\":\"PRODUTO\",\"preco\":30,\"estoque\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipo").value("PRODUTO"))
+                .andExpect(jsonPath("$.estoque").value(0));
+    }
+
+    @Test
+    void deveInativarItem() throws Exception {
         UUID id = criar("Corte", "SERVICO", "30", null);
 
         inativar(id);
         mockMvc.perform(get("/api/v1/itens/{id}", id).with(user(USERNAME)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ativo").value(false));
+    }
+
+    @Test
+    void deveReativarItem() throws Exception {
+        UUID id = criar("Corte", "SERVICO", "30", null);
+        inativar(id);
 
         mockMvc.perform(patch("/api/v1/itens/{id}/ativar", id)
                         .with(csrf()).with(user(USERNAME)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ativo").value(true));
+    }
+
+    @Test
+    void deveExcluirItemSemHistoricoQuandoSolicitado() throws Exception {
+        UUID id = criar("Corte avulso", "SERVICO", "30", null);
+
+        mockMvc.perform(delete("/api/v1/itens/{id}", id)
+                        .with(csrf()).with(user(USERNAME)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/itens/{id}", id).with(user(USERNAME)))
+                .andExpect(status().isNotFound());
     }
 
     @Test

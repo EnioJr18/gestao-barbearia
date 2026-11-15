@@ -14,6 +14,10 @@ public record CaixaResponse(
         BigDecimal valorInicial,
         BigDecimal entradasDinheiro,
         BigDecimal saidasDinheiro,
+        BigDecimal dinheiro,
+        BigDecimal pix,
+        BigDecimal debito,
+        BigDecimal credito,
         BigDecimal valorEsperado,
         BigDecimal valorApurado,
         BigDecimal diferenca,
@@ -31,12 +35,17 @@ public record CaixaResponse(
 
     public static CaixaResponse from(Caixa caixa, BigDecimal entradasDinheiro,
                                      BigDecimal saidasDinheiro, BigDecimal valorEsperado) {
+        BigDecimal dinheiro = entradasDinheiro;
         return new CaixaResponse(
                 caixa.getId(),
                 caixa.getDataCaixa(),
                 caixa.getValorInicial(),
                 entradasDinheiro,
                 saidasDinheiro,
+                dinheiro,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
                 valorEsperado,
                 caixa.getValorApurado(),
                 caixa.getDiferenca(),

@@ -7,10 +7,28 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public interface MovimentacaoRepository
         extends JpaRepository<Movimentacao, UUID>, JpaSpecificationExecutor<Movimentacao> {
+
+    @Query("""
+        SELECT new br.com.barbeirofinanceiro.domain.movimentacao.DespesaCaixaResumoProjection(
+            m.caixa.id,
+            SUM(m.valor)
+        )
+        FROM Movimentacao m
+        WHERE m.caixa.id IN :caixaIds
+          AND m.tipo = br.com.barbeirofinanceiro.domain.movimentacao.TipoMovimentacao.DESPESA
+          AND m.formaPagamento =
+              br.com.barbeirofinanceiro.domain.movimentacao.FormaPagamento.DINHEIRO
+        GROUP BY m.caixa.id
+        """)
+    List<DespesaCaixaResumoProjection> buscarDespesasDinheiroPorCaixas(
+            @Param("caixaIds") Collection<UUID> caixaIds
+    );
 
     @Query("""
         SELECT COALESCE(SUM(m.valor), 0)

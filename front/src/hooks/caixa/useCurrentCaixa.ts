@@ -5,8 +5,10 @@ import type { CaixaResponse } from './types'
 
 const getCurrentCaixa = async (): Promise<CaixaResponse | null> => {
   try {
-    const { data } = await api.get<CaixaResponse>('/caixas/atual')
-    return data ?? null
+    const response = await api.get<CaixaResponse>('/caixas/atual')
+    if (response.status === 204 || !response.data) return null
+
+    return response.data
   } catch (error) {
     if (error instanceof AxiosError && error.response?.status === 404) {
       return null

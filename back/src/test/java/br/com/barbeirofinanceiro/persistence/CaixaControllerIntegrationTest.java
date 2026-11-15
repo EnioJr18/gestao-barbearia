@@ -108,7 +108,7 @@ class CaixaControllerIntegrationTest extends PostgresPersistenceTest {
     void deveRetornar404QuandoNaoHouverCaixaAtual() throws Exception {
         mockMvc.perform(get("/api/v1/caixas/atual")
                         .with(user(USER_EMAIL)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNoContent());
     }
 
     @Test

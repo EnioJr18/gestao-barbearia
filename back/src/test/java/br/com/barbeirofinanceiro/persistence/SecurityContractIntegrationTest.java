@@ -76,7 +76,7 @@ class SecurityContractIntegrationTest extends PostgresPersistenceTest {
     void devePermitirAcessoEmRotaProtegidaComTokenValido() throws Exception {
         mockMvc.perform(get("/api/v1/caixas/atual")
                         .header("Authorization", "Bearer " + tokenValido))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNoContent());
     }
 
     @Test

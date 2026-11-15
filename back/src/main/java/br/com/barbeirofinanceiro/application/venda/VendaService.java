@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,6 +62,90 @@ public class VendaService {
     @Transactional
     public VendaResponse criarComResposta(CriarVendaRequest request) {
         return resposta(criarVenda(request));
+    }
+
+    @Transactional
+    public VendaResponse atualizarComResposta(UUID id, CriarVendaRequest request) {
+        Venda venda = carregar(id);
+        if (venda.getStatus() != StatusVenda.FINALIZADA) {
+            throw new VendaConflictException("Não é possível editar uma venda cancelada");
+        }
+        Caixa caixa = caixaRepository.findByIdForUpdate(venda.getCaixa().getId())
+                .orElseThrow(() -> new VendaNotFoundException("Caixa não encontrado"));
+        if (caixa.getStatus() != br.com.barbeirofinanceiro.domain.caixa.StatusCaixa.ABERTO) {
+            throw new VendaConflictException("Não é possível editar uma venda de caixa fechado");
+        }
+        List<ItemVenda> linhasOriginais = itemVendaRepository.findByVendaId(id);
+        Map<UUID, ItemVenda> linhasOriginaisPorItem = linhasOriginais.stream()
+                .collect(Collectors.toMap(linha -> linha.getItem().getId(), Function.identity()));
+        for (ItemVenda linha : linhasOriginais) {
+            Item item = itemRepository.findByIdForUpdate(linha.getItem().getId())
+                    .orElseThrow(() -> new VendaNotFoundException("Item não encontrado"));
+            if (item.getTipo() == TipoItem.PRODUTO) {
+                item.setEstoque((item.getEstoque() == null ? 0 : item.getEstoque()) + linha.getQuantidade());
+                itemRepository.save(item);
+            }
+        }
+        Cliente cliente = request.clienteId() == null ? null
+                : clienteRepository.findById(request.clienteId())
+                .orElseThrow(() -> new VendaNotFoundException("Cliente não encontrado"));
+        if (request.itens().stream().map(CriarVendaRequest.ItemRequest::itemId).distinct().count()
+                != request.itens().size()) {
+            throw new VendaValidationException("Não é permitido repetir o mesmo item na venda");
+        }
+        itemVendaRepository.deleteAll(linhasOriginais);
+        pagamentoRepository.deleteAll(pagamentoRepository.findByVendaId(id));
+        itemVendaRepository.flush();
+        pagamentoRepository.flush();
+
+        BigDecimal total = BigDecimal.ZERO;
+        List<ItemVenda> linhas = new ArrayList<>();
+        for (CriarVendaRequest.ItemRequest itemRequest : request.itens()) {
+            if (itemRequest.quantidade() == null || itemRequest.quantidade() <= 0) {
+                throw new VendaValidationException("quantidade deve ser maior que zero");
+            }
+            Item item = itemRepository.findByIdForUpdate(itemRequest.itemId())
+                    .orElseThrow(() -> new VendaNotFoundException("Item não encontrado"));
+            ItemVenda linhaOriginal = linhasOriginaisPorItem.get(item.getId());
+            if (!item.isAtivo() && linhaOriginal == null) {
+                throw new VendaConflictException("Item inativo não pode ser vendido");
+            }
+            if (item.getTipo() == TipoItem.PRODUTO) {
+                if (item.getEstoque() == null || item.getEstoque() < itemRequest.quantidade()) {
+                    throw new VendaConflictException("Estoque insuficiente");
+                }
+                item.setEstoque(item.getEstoque() - itemRequest.quantidade());
+                itemRepository.save(item);
+            }
+            BigDecimal precoUnitario = linhaOriginal == null ? item.getPreco() : linhaOriginal.getPrecoUnitario();
+            BigDecimal subtotal = precoUnitario.multiply(BigDecimal.valueOf(itemRequest.quantidade()));
+            total = total.add(subtotal);
+            ItemVenda linha = new ItemVenda();
+            linha.setVenda(venda);
+            linha.setItem(item);
+            linha.setQuantidade(itemRequest.quantidade());
+            linha.setPrecoUnitario(precoUnitario);
+            linha.setSubtotal(subtotal);
+            linhas.add(linha);
+        }
+        if (total.signum() <= 0) {
+            throw new VendaValidationException("valor total deve ser maior que zero");
+        }
+        validarPagamentos(request.pagamentos(), total);
+        venda.setCliente(cliente);
+        venda.setValorTotal(total);
+        vendaRepository.saveAndFlush(venda);
+        linhas.forEach(itemVendaRepository::save);
+        itemVendaRepository.flush();
+        request.pagamentos().forEach(pagamentoRequest -> {
+            VendaPagamento pagamento = new VendaPagamento();
+            pagamento.setVenda(venda);
+            pagamento.setFormaPagamento(pagamentoRequest.formaPagamento());
+            pagamento.setValor(pagamentoRequest.valor());
+            pagamentoRepository.save(pagamento);
+        });
+        pagamentoRepository.flush();
+        return resposta(venda);
     }
 
     private Venda criarVenda(CriarVendaRequest request) {
@@ -149,6 +234,14 @@ public class VendaService {
     @Transactional
     public VendaResponse cancelarComResposta(UUID id) {
         return resposta(cancelarVenda(id));
+    }
+
+    @Transactional(readOnly = true)
+    public void excluir(UUID id) {
+        carregar(id);
+        throw new VendaConflictException(
+                "Vendas não podem ser excluídas. Utilize o cancelamento para preservar o histórico financeiro."
+        );
     }
 
     private Venda cancelarVenda(UUID id) {

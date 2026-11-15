@@ -1,13 +1,24 @@
 import { useMemo, useState } from 'react'
-import { FiPlus, FiSearch, FiShoppingBag } from 'react-icons/fi'
+import {
+  FiPlus,
+  FiSearch,
+  FiShoppingBag,
+  FiEdit2,
+  FiTrash2,
+  FiMinus,
+  FiX,
+  FiXCircle,
+} from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { useAllClientes } from '@/hooks/cliente/useAllClientes'
-import { useAllItens } from '@/hooks/item/useAllItens'
+import { useCompleteItens } from '@/hooks/item/useCompleteItens'
 import { useAllVendas } from '@/hooks/venda/useAllVendas'
 import { useCreateVenda } from '@/hooks/venda/useCreateVenda'
+import { useUpdateVenda } from '@/hooks/venda/useUpdateVenda'
+import { useCancelVenda } from '@/hooks/venda/useCancelVenda'
 import type { FormaPagamento } from '@/hooks/venda/types'
+import { getApiErrorMessage } from '@/services/apiError'
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
@@ -22,19 +33,27 @@ const paymentLabels: Record<FormaPagamento, string> = {
 
 export function Pedidos() {
   const [form, setForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [clientId, setClientId] = useState('')
-  const [itemId, setItemId] = useState('')
-  const [quantity, setQuantity] = useState(1)
+  const [cart, setCart] = useState<Record<string, number>>({})
+  const [historicalPrices, setHistoricalPrices] = useState<Record<string, number>>({})
   const [payment, setPayment] = useState<FormaPagamento>('PIX')
   const { data: orders = [], isLoading, error } = useAllVendas()
   const { data: clients = [] } = useAllClientes({ ativo: true })
-  const { data: items = [] } = useAllItens({ ativo: true })
+  const {
+    data: items = [],
+    isLoading: itemsLoading,
+    error: itemsError,
+  } = useCompleteItens()
   const createVendaMutation = useCreateVenda()
+  const updateVendaMutation = useUpdateVenda()
+  const cancelVendaMutation = useCancelVenda()
   const itemById = useMemo(
     () => new Map(items.map((item) => [item.id, item])),
     [items],
   )
+  const activeItems = useMemo(() => items.filter((item) => item.ativo), [items])
   const clientById = useMemo(
     () => new Map(clients.map((client) => [client.id, client])),
     [clients],
@@ -45,26 +64,61 @@ export function Pedidos() {
       : 'Cliente avulso'
     return `${client} ${order.id}`.toLowerCase().includes(search.toLowerCase())
   })
-  const selectedItem = itemById.get(itemId)
-  const total = selectedItem ? Number(selectedItem.preco) * quantity : 0
+  const cartItems = items.filter((item) => cart[item.id])
+  const total = cartItems.reduce(
+    (sum, item) =>
+      sum + (historicalPrices[item.id] ?? Number(item.preco)) * cart[item.id],
+    0,
+  )
+
+  const addItem = (id: string) => {
+    if (!itemById.get(id)?.ativo) return
+    setCart((current) => ({ ...current, [id]: (current[id] ?? 0) + 1 }))
+  }
+  const removeCartItem = (id: string) => {
+    setCart((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+  }
+
+  const removeItem = (id: string) => {
+    if ((cart[id] ?? 0) <= 1) {
+      removeCartItem(id)
+      return
+    }
+    setCart((current) => ({ ...current, [id]: current[id] - 1 }))
+  }
+
+  const openNewOrder = () => {
+    setEditingId(null)
+    setClientId('')
+    setCart({})
+    setHistoricalPrices({})
+    setPayment('PIX')
+    setForm(true)
+  }
 
   const submit = () => {
-    if (!itemId || quantity < 1 || total <= 0) return
-    createVendaMutation.mutate(
-      {
-        clienteId: clientId || undefined,
-        itens: [{ itemId, quantidade: quantity }],
-        pagamentos: [{ formaPagamento: payment, valor: total }],
-      },
-      {
-        onSuccess: () => {
-          setForm(false)
-          setClientId('')
-          setItemId('')
-          setQuantity(1)
-        },
-      },
-    )
+    if (!cartItems.length || total <= 0) return
+    const payload = {
+      clienteId: clientId || undefined,
+      itens: cartItems.map((item) => ({ itemId: item.id, quantidade: cart[item.id] })),
+      pagamentos: [{ formaPagamento: payment, valor: total }],
+    }
+    const options = { onSuccess: () => { setForm(false); setEditingId(null); setClientId(''); setCart({}); setHistoricalPrices({}); setPayment('PIX') } }
+    if (editingId) updateVendaMutation.mutate({ id: editingId, payload }, options)
+    else createVendaMutation.mutate(payload, options)
+  }
+
+  const editOrder = (order: (typeof orders)[number]) => {
+    setEditingId(order.id)
+    setClientId(order.clienteId ?? '')
+    setCart(Object.fromEntries(order.itens.map((line) => [line.itemId, line.quantidade])))
+    setHistoricalPrices(Object.fromEntries(order.itens.map((line) => [line.itemId, Number(line.precoUnitario)])))
+    setPayment(order.pagamentos[0]?.formaPagamento ?? 'PIX')
+    setForm(true)
   }
 
   return (
@@ -83,84 +137,200 @@ export function Pedidos() {
         </div>
         <Button
           size="lg"
-          className="h-10 px-4 text-sm [&_svg:not([class*='size-'])]:size-4"
-          onClick={() => setForm(!form)}
+          className="h-12 rounded-xl px-5 text-lg [&_svg:not([class*='size-'])]:size-5"
+          onClick={openNewOrder}
         >
           <FiPlus /> Novo pedido
         </Button>
       </div>
       {form && (
-        <Card className="mb-4 grid gap-3 p-5 md:grid-cols-4 md:items-end">
-          <div>
-            <h2 className="font-heading text-3xl font-bold">Novo pedido</h2>
-            <p className="text-md text-muted-foreground">
-              Escolha cliente, item e pagamento.
-            </p>
-          </div>
-          <select
-            value={clientId}
-            onChange={(event) => setClientId(event.target.value)}
-            className="h-12 rounded-lg border bg-background px-3 text-lg"
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"
+          onMouseDown={() => setForm(false)}
+        >
+          <Card
+            className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-white/40 p-8 shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
           >
-            <option value="">Cliente avulso</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.nome}
-              </option>
-            ))}
-          </select>
-          <select
-            value={itemId}
-            onChange={(event) => setItemId(event.target.value)}
-            className="h-12 rounded-lg border bg-background px-3 text-lg"
-          >
-            <option value="">Selecione o item</option>
-            {items.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.nome} · {formatCurrency(Number(item.preco))}
-              </option>
-            ))}
-          </select>
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              min="1"
-              value={quantity}
-              onChange={(event) => setQuantity(Number(event.target.value))}
-              className="h-12 w-24 text-lg"
-            />
-            <select
-              value={payment}
-              onChange={(event) =>
-                setPayment(event.target.value as FormaPagamento)
-              }
-              className="h-12 min-w-0 flex-1 rounded-lg border bg-background px-2 text-lg"
-            >
-              {Object.entries(paymentLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button
-            size="lg"
-            className="h-12 px-4 text-lg [&_svg:not([class*='size-'])]:size-4 md:col-span-4"
-            onClick={submit}
-            disabled={createVendaMutation.isPending || !itemId}
-          >
-            {createVendaMutation.isPending
-              ? 'Salvando...'
-              : `Finalizar pedido${total ? ` · ${formatCurrency(total)}` : ''}`}
-          </Button>
-          {createVendaMutation.error && (
-            <p className="md:col-span-4 text-sm text-red-600">
-              Não foi possível criar o pedido. Verifique se o caixa está aberto.
-            </p>
-          )}
-        </Card>
+            <div className="mb-8 flex items-start justify-between">
+              <div>
+                <h2 className="font-heading text-4xl font-bold">{editingId ? 'Editar pedido' : 'Novo pedido'}</h2>
+                <p className="mt-1 text-lg text-muted-foreground">
+                  Selecione os serviços e produtos da venda.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Fechar formulário"
+                className="rounded-lg p-2 text-muted-foreground hover:bg-muted"
+                onClick={() => setForm(false)}
+              >
+                <FiX className="size-5" />
+              </button>
+            </div>
+            <div className="grid gap-10 lg:grid-cols-[1fr_1fr]">
+              <div className="space-y-7">
+                {itemsLoading ? (
+                  <p className="text-lg text-muted-foreground">Carregando itens...</p>
+                ) : itemsError ? (
+                  <p className="text-lg text-red-600">Não foi possível carregar os itens.</p>
+                ) : activeItems.length === 0 ? (
+                  <p className="text-lg text-muted-foreground">Nenhum item ativo disponível.</p>
+                ) : (
+                  (['SERVICO', 'PRODUTO'] as const).map((type) => (
+                    <section key={type}>
+                      <h3 className="mb-3 text-lg font-bold uppercase tracking-wider text-muted-foreground">
+                        {type === 'SERVICO' ? 'Serviços' : 'Produtos'}
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        {activeItems
+                          .filter((item) => item.tipo === type)
+                          .map((item) => (
+                            <button
+                              type="button"
+                              key={item.id}
+                              onClick={() => addItem(item.id)}
+                              className="rounded-xl bg-muted/80 p-4 text-left transition-colors hover:bg-primary/15"
+                            >
+                              <span className="block text-xl font-semibold">
+                                {item.nome}
+                              </span>
+                              <span className="text-lg text-primary">
+                                {formatCurrency(Number(item.preco))}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </section>
+                  ))
+                )}
+              </div>
+              <div className="space-y-6">
+                <label className="grid gap-2 text-lg font-semibold">
+                  Cliente
+                  <select
+                    value={clientId}
+                    onChange={(event) => setClientId(event.target.value)}
+                    className="h-12 rounded-xl border bg-background px-3 text-lg font-normal"
+                  >
+                    <option value="">Cliente avulso</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.nome}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="rounded-xl border p-4">
+                  {cartItems.length ? (
+                    cartItems.map((item) => (
+                      <div
+                        className="flex items-center gap-4 border-b py-4 last:border-0"
+                        key={item.id}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-xl font-semibold">
+                          {item.nome}
+                          <small className="block text-sm font-normal text-muted-foreground">
+                            {formatCurrency(historicalPrices[item.id] ?? Number(item.preco))}
+                            {!item.ativo ? ' · Item inativo' : ''}
+                          </small>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remover ${item.nome}`}
+                          onClick={() => removeCartItem(item.id)}
+                        >
+                          <FiTrash2 className="size-5 text-muted-foreground" />
+                        </button>
+                        <button type="button" onClick={() => removeItem(item.id)}>
+                          <FiMinus className="size-5" />
+                        </button>
+                        <span className="w-8 text-center text-2xl font-bold text-primary">
+                          {cart[item.id]}
+                        </span>
+                        <button type="button" disabled={!item.ativo} onClick={() => addItem(item.id)}>
+                          <FiPlus className="size-5" />
+                        </button>
+                        <strong className="w-28 text-right text-lg">
+                          {formatCurrency(
+                            (historicalPrices[item.id] ?? Number(item.preco)) * cart[item.id],
+                          )}
+                        </strong>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="py-6 text-center text-lg text-muted-foreground">
+                      Adicione itens ao pedido.
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-3">
+                  <label className="grid gap-2 text-lg font-semibold">
+                    Pagamento
+                    <select
+                      value={payment}
+                      onChange={(event) =>
+                        setPayment(event.target.value as FormaPagamento)
+                      }
+                      className="h-12 rounded-xl border bg-background px-3 text-lg font-normal"
+                    >
+                      {Object.entries(paymentLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-muted p-5">
+                  <span className="text-lg">Total</span>
+                  <strong className="text-4xl text-primary">
+                    {formatCurrency(total)}
+                  </strong>
+                </div>
+                {createVendaMutation.error && (
+                  <p className="text-base text-red-600">
+                    Não foi possível criar o pedido. Verifique se o caixa está aberto.
+                  </p>
+                )}
+                <div className="flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 px-6 text-lg"
+                    onClick={() => setForm(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-12 px-6 text-lg"
+                    onClick={submit}
+                    disabled={
+                      createVendaMutation.isPending ||
+                      updateVendaMutation.isPending ||
+                      itemsLoading ||
+                      Boolean(itemsError) ||
+                      !cartItems.length
+                    }
+                  >
+                    {createVendaMutation.isPending || updateVendaMutation.isPending ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Finalizar venda'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
       )}
       <Card className="overflow-hidden rounded-xl border shadow-sm">
+        {cancelVendaMutation.error && (
+          <p className="border-b px-5 py-3 text-base text-red-600">
+            {getApiErrorMessage(
+              cancelVendaMutation.error,
+              'Não foi possível cancelar o pedido.',
+            )}
+          </p>
+        )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
             <FiSearch />
@@ -185,24 +355,25 @@ export function Pedidos() {
                 <th>VALOR</th>
                 <th>PAGAMENTO</th>
                 <th>STATUS</th>
+                <th>AÇÕES</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="text-center">
+                  <td colSpan={7} className="text-center">
                     Carregando pedidos...
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={6} className="text-center text-red-600">
+                  <td colSpan={7} className="text-center text-red-600">
                     Não foi possível carregar os pedidos.
                   </td>
                 </tr>
               ) : visibleOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center">
+                  <td colSpan={7} className="text-center">
                     Nenhum pedido encontrado.
                   </td>
                 </tr>
@@ -236,12 +407,29 @@ export function Pedidos() {
                     </td>
                     <td>
                       <span
-                        className={`status-pill ${order.status === 'FINALIZADA' ? 'green' : 'gray'}`}
+                        className={`status-pill px-3 py-1.5 text-sm font-semibold ${order.status === 'FINALIZADA' ? 'green' : 'gray'}`}
                       >
                         {order.status === 'FINALIZADA'
                           ? 'Concluído'
                           : 'Cancelado'}
                       </span>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <button type="button" title="Editar" aria-label="Editar pedido" disabled={order.status !== 'FINALIZADA'} onClick={() => editOrder(order)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-amber-500/15 hover:text-amber-300"><FiEdit2 /></button>
+                        <button
+                          type="button"
+                          title="Cancelar"
+                          aria-label="Cancelar pedido"
+                          disabled={order.status !== 'FINALIZADA' || cancelVendaMutation.isPending}
+                          onClick={() => window.confirm(
+                            `Cancelar o pedido #${order.id.slice(0, 8)}? O cancelamento preserva o histórico e não poderá ser desfeito pelo fluxo normal.`,
+                          ) && cancelVendaMutation.mutate(order.id)}
+                          className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"
+                        >
+                          <FiXCircle />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

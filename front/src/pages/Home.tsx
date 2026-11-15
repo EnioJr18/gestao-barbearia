@@ -437,7 +437,7 @@ function Overview({
             <div className="chart-wrap">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} barSize={22}>
-                  <CartesianGrid vertical={false} stroke="#e9eef0" />
+                  <CartesianGrid vertical={false} stroke="#302b27" />
                   <XAxis
                     dataKey="name"
                     axisLine={false}
@@ -454,7 +454,7 @@ function Overview({
                   <Tooltip
                     formatter={(value) => [`R$ ${value},00`, 'Faturamento']}
                   />
-                  <Bar dataKey="total" fill="#0d6b68" radius={[5, 5, 0, 0]} />
+                  <Bar dataKey="total" fill="#efad43" radius={[5, 5, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -810,7 +810,7 @@ function Reports() {
                 data={chartData.concat([{ name: '31', total: 780 }])}
                 barSize={30}
               >
-                <CartesianGrid vertical={false} stroke="#e9eef0" />
+                <CartesianGrid vertical={false} stroke="#302b27" />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
@@ -822,7 +822,7 @@ function Reports() {
                   tickLine={false}
                   tick={{ fill: '#91a0a3', fontSize: 11 }}
                 />
-                <Bar dataKey="total" fill="#d99536" radius={[5, 5, 0, 0]} />
+                <Bar dataKey="total" fill="#efad43" radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

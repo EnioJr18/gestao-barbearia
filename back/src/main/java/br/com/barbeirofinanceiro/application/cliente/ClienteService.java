@@ -2,21 +2,29 @@ package br.com.barbeirofinanceiro.application.cliente;
 
 import br.com.barbeirofinanceiro.domain.cliente.Cliente;
 import br.com.barbeirofinanceiro.domain.cliente.ClienteRepository;
+import br.com.barbeirofinanceiro.domain.cliente.ClienteResumoProjection;
+import br.com.barbeirofinanceiro.domain.venda.VendaRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class ClienteService {
     private final ClienteRepository clienteRepository;
+    private final VendaRepository vendaRepository;
 
-    public ClienteService(ClienteRepository clienteRepository) {
+    public ClienteService(ClienteRepository clienteRepository, VendaRepository vendaRepository) {
         this.clienteRepository = clienteRepository;
+        this.vendaRepository = vendaRepository;
     }
 
     @Transactional
@@ -48,6 +56,19 @@ public class ClienteService {
                 .orElseThrow(() -> new ClienteNotFoundException("Cliente não encontrado"));
     }
 
+    @Transactional(readOnly = true)
+    public List<ClienteResumoProjection> resumos() {
+        return clienteRepository.buscarResumoVendas();
+    }
+
+    @Transactional(readOnly = true)
+    public ClienteResumoProjection resumo(UUID id) {
+        return resumos().stream()
+                .filter(resumo -> resumo.clienteId().equals(id))
+                .findFirst()
+                .orElse(new ClienteResumoProjection(id, 0, java.math.BigDecimal.ZERO, null));
+    }
+
     @Transactional
     public Cliente atualizar(UUID id, AtualizarClienteRequest request) {
         Cliente cliente = buscar(id);
@@ -61,6 +82,24 @@ public class ClienteService {
         Cliente cliente = buscar(id);
         cliente.setAtivo(ativo);
         return clienteRepository.saveAndFlush(cliente);
+    }
+
+    @Transactional
+    public void excluir(UUID id) {
+        Cliente cliente = buscar(id);
+        if (vendaRepository.existsByClienteId(id)) {
+            throw new ClienteConflictException(
+                    "Cliente possui histórico de vendas e não pode ser excluído. Inative o cliente para impedir novos usos."
+            );
+        }
+        try {
+            clienteRepository.delete(cliente);
+            clienteRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new ClienteConflictException(
+                    "Cliente possui vínculos e não pode ser excluído. Inative o cliente para impedir novos usos."
+            );
+        }
     }
 
     private String normalizarNome(String nome) { return nome.trim(); }

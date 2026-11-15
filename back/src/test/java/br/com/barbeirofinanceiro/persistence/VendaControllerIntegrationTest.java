@@ -103,13 +103,140 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
         criarEsperando("{\"itens\":[{\"itemId\":\"" + item + "\",\"quantidade\":2}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":70}]}", 409);
     }
 
-    @Test void deveCancelarERestaurarEstoqueSemPermitirSegundoCancelamento() throws Exception {
+    @Test void devePreservarProdutoInativoEPrecoHistoricoAoEditarVenda() throws Exception {
+        UUID item = item("Pomada", TipoItem.PRODUTO, "35", 5);
+        UUID venda = criarVenda(item, 1, "PIX", "35");
+        Item produto = itemRepository.findById(item).orElseThrow();
+        produto.setAtivo(false);
+        produto.setPreco(BigDecimal.valueOf(50));
+        itemRepository.saveAndFlush(produto);
+
+        String body = "{\"itens\":[{\"itemId\":\"" + item
+                + "\",\"quantidade\":1}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":35}]}";
+        mockMvc.perform(put("/api/v1/vendas/{id}", venda).with(csrf()).with(user(USER))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valorTotal").value(35.0))
+                .andExpect(jsonPath("$.itens[0].itemId").value(item.toString()))
+                .andExpect(jsonPath("$.itens[0].precoUnitario").value(35.0));
+
+        mockMvc.perform(get("/api/v1/vendas/{id}", venda).with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.itens[0].itemId").value(item.toString()))
+                .andExpect(jsonPath("$.itens[0].precoUnitario").value(35.0));
+        assertThat(itemRepository.findById(item).orElseThrow().getEstoque()).isEqualTo(4);
+    }
+
+    @Test void deveAdicionarItemAtivoERemoverLinhaSomenteQuandoSolicitado() throws Exception {
+        UUID produtoOriginal = item("Pomada", TipoItem.PRODUTO, "35", 5);
+        UUID produtoNovo = item("Cera", TipoItem.PRODUTO, "20", 5);
+        UUID venda = criarVenda(produtoOriginal, 1, "PIX", "35");
+
+        String comNovoItem = "{\"itens\":[{\"itemId\":\"" + produtoOriginal
+                + "\",\"quantidade\":1},{\"itemId\":\"" + produtoNovo
+                + "\",\"quantidade\":1}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":55}]}";
+        mockMvc.perform(put("/api/v1/vendas/{id}", venda).with(csrf()).with(user(USER))
+                        .contentType(MediaType.APPLICATION_JSON).content(comNovoItem))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens", org.hamcrest.Matchers.hasSize(2)));
+
+        String semItemOriginal = "{\"itens\":[{\"itemId\":\"" + produtoNovo
+                + "\",\"quantidade\":1}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":20}]}";
+        mockMvc.perform(put("/api/v1/vendas/{id}", venda).with(csrf()).with(user(USER))
+                        .contentType(MediaType.APPLICATION_JSON).content(semItemOriginal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.itens[0].itemId").value(produtoNovo.toString()));
+
+        mockMvc.perform(get("/api/v1/vendas/{id}", venda).with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.itens[0].itemId").value(produtoNovo.toString()));
+        assertThat(itemRepository.findById(produtoOriginal).orElseThrow().getEstoque()).isEqualTo(5);
+        assertThat(itemRepository.findById(produtoNovo).orElseThrow().getEstoque()).isEqualTo(4);
+    }
+
+    @Test void naoDeveAdicionarItemInativoNovoDuranteEdicao() throws Exception {
+        UUID itemOriginal = item("Corte", TipoItem.SERVICO, "30", null);
+        UUID itemInativo = item("Barba", TipoItem.SERVICO, "20", null);
+        UUID venda = criarVenda(itemOriginal, 1, "PIX", "30");
+        Item inativo = itemRepository.findById(itemInativo).orElseThrow();
+        inativo.setAtivo(false);
+        itemRepository.saveAndFlush(inativo);
+
+        String body = "{\"itens\":[{\"itemId\":\"" + itemOriginal
+                + "\",\"quantidade\":1},{\"itemId\":\"" + itemInativo
+                + "\",\"quantidade\":1}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":50}]}";
+        mockMvc.perform(put("/api/v1/vendas/{id}", venda).with(csrf()).with(user(USER))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(get("/api/v1/vendas/{id}", venda).with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.itens[0].itemId").value(itemOriginal.toString()));
+    }
+
+    @Test void deveCancelarPreservarHistoricoERestaurarEstoque() throws Exception {
         UUID item = item("Pomada", TipoItem.PRODUTO, "35", 2); UUID venda = criarVenda(item, 1, "PIX", "35");
         mockMvc.perform(post("/api/v1/vendas/{id}/cancelar", venda).with(csrf()).with(user(USER)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELADA"));
         assertThat(itemRepository.findById(item).get().getEstoque()).isEqualTo(2);
+        assertThat(vendaRepository.findById(venda)).isPresent();
+        assertThat(itemVendaRepository.findByVendaId(venda)).hasSize(1);
+        assertThat(pagamentoRepository.findByVendaId(venda)).hasSize(1);
+    }
+
+    @Test void naoDeveDuplicarReposicaoAoRepetirCancelamento() throws Exception {
+        UUID item = item("Pomada", TipoItem.PRODUTO, "35", 2); UUID venda = criarVenda(item, 1, "PIX", "35");
+        mockMvc.perform(post("/api/v1/vendas/{id}/cancelar", venda).with(csrf()).with(user(USER)))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/vendas/{id}/cancelar", venda).with(csrf()).with(user(USER)))
                 .andExpect(status().isConflict());
+        assertThat(itemRepository.findById(item).orElseThrow().getEstoque()).isEqualTo(2);
+    }
+
+    @Test void deleteNaoRemoveVendaNemHistorico() throws Exception {
+        UUID item = item("Pomada", TipoItem.PRODUTO, "35", 2);
+        UUID venda = criarVenda(item, 1, "PIX", "35");
+
+        mockMvc.perform(delete("/api/v1/vendas/{id}", venda).with(csrf()).with(user(USER)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cancelamento")));
+
+        assertThat(vendaRepository.findById(venda)).isPresent();
+        assertThat(vendaRepository.findById(venda).orElseThrow().getStatus()).isEqualTo(StatusVenda.FINALIZADA);
+        assertThat(itemVendaRepository.findByVendaId(venda)).hasSize(1);
+        assertThat(pagamentoRepository.findByVendaId(venda)).hasSize(1);
+        assertThat(itemRepository.findById(item).orElseThrow().getEstoque()).isEqualTo(1);
+    }
+
+    @Test void itemComHistoricoNaoPodeSerExcluidoFisicamente() throws Exception {
+        UUID item = item("Corte histórico", TipoItem.SERVICO, "30", null);
+        criarVenda(item, 1, "PIX", "30");
+
+        mockMvc.perform(delete("/api/v1/itens/{id}", item).with(csrf()).with(user(USER)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Inative o item")));
+
+        assertThat(itemRepository.findById(item)).isPresent();
+    }
+
+    @Test void clienteComHistoricoNaoPodeSerExcluidoEPreservaAgregados() throws Exception {
+        UUID item = item("Corte cliente", TipoItem.SERVICO, "30", null);
+        UUID cliente = cliente("Cliente histórico");
+        criarVendaComCliente(item, cliente, "30");
+
+        mockMvc.perform(delete("/api/v1/clientes/{id}", cliente).with(csrf()).with(user(USER)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Inative o cliente")));
+
+        mockMvc.perform(get("/api/v1/clientes/{id}", cliente).with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visitas").value(1))
+                .andExpect(jsonPath("$.totalGasto").value(30.0))
+                .andExpect(jsonPath("$.ultimaVisita").value(LocalDate.now().toString()));
     }
 
     @Test void naoDeveCancelarVendaDeCaixaFechado() throws Exception {
@@ -178,6 +305,15 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
         String json = "{\"itens\":[{\"itemId\":\"" + item + "\",\"quantidade\":" + quantidade + "}],\"pagamentos\":[{\"formaPagamento\":\"" + forma + "\",\"valor\":" + valor + "}]}";
         MvcResult r = mockMvc.perform(post("/api/v1/vendas").with(csrf()).with(user(USER)).contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().isCreated()).andReturn();
         return UUID.fromString(mapper.readTree(r.getResponse().getContentAsString()).get("id").asText());
+    }
+    private UUID criarVendaComCliente(UUID item, UUID cliente, String valor) throws Exception {
+        String json = "{\"clienteId\":\"" + cliente + "\",\"itens\":[{\"itemId\":\"" + item
+                + "\",\"quantidade\":1}],\"pagamentos\":[{\"formaPagamento\":\"PIX\",\"valor\":"
+                + valor + "}]}";
+        MvcResult result = mockMvc.perform(post("/api/v1/vendas").with(csrf()).with(user(USER))
+                        .contentType(MediaType.APPLICATION_JSON).content(json))
+                .andExpect(status().isCreated()).andReturn();
+        return UUID.fromString(mapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
     }
     private void criarEsperando(String json, int code) throws Exception { mockMvc.perform(post("/api/v1/vendas").with(csrf()).with(user(USER)).contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().is(code)); }
     private UUID item(String nome, TipoItem tipo, String preco, Integer estoque) { Item i=new Item(); i.setNome(nome); i.setTipo(tipo); i.setPreco(new BigDecimal(preco)); i.setEstoque(estoque); return itemRepository.saveAndFlush(i).getId(); }

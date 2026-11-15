@@ -18,6 +18,8 @@ export const useOpenCaixa = () => {
     onSuccess: (caixa) => {
       queryClient.setQueryData(['caixa', 'atual'], caixa)
       queryClient.invalidateQueries({ queryKey: ['caixa'] })
+      queryClient.invalidateQueries({ queryKey: ['caixa', 'historico'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (error) => {
       if (error instanceof AxiosError && error.response?.status === 409) {

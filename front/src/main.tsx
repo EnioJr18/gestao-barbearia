@@ -8,6 +8,8 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 // import {Home} from './pages/Home.tsx';
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Produtos } from './pages/Produtos.tsx'
+import { Servicos } from './pages/Servicos.tsx'
+import { Caixa } from './pages/Caixa.tsx'
 import { Clientes } from './pages/Clientes.tsx'
 import { Pedidos } from './pages/Pedidos.tsx'
 import { Relatorios } from './pages/Relatorios.tsx'
@@ -28,6 +30,8 @@ const router = createBrowserRouter([
       { index: true, element: <Dashboard /> },
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'produtos', element: <Produtos /> },
+      { path: 'servicos', element: <Servicos /> },
+      { path: 'caixa', element: <Caixa /> },
       { path: 'clientes', element: <Clientes /> },
       { path: 'pedidos', element: <Pedidos /> },
       { path: 'relatorios', element: <Relatorios /> },

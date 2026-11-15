@@ -3,6 +3,7 @@ package br.com.barbeirofinanceiro.application.item;
 import br.com.barbeirofinanceiro.domain.item.Item;
 import br.com.barbeirofinanceiro.domain.item.ItemRepository;
 import br.com.barbeirofinanceiro.domain.item.TipoItem;
+import br.com.barbeirofinanceiro.domain.venda.ItemVendaRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,21 +21,37 @@ public class ItemService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final ItemRepository itemRepository;
+    private final ItemVendaRepository itemVendaRepository;
 
-    public ItemService(ItemRepository itemRepository) {
+    public ItemService(ItemRepository itemRepository, ItemVendaRepository itemVendaRepository) {
         this.itemRepository = itemRepository;
+        this.itemVendaRepository = itemVendaRepository;
     }
 
     @Transactional
     public Item criar(CriarItemRequest request) {
-        validarEstoque(request.tipo(), request.estoque());
-        validarNomeDisponivel(request.nome(), null);
+        return criar(request.nome(), request.preco(), request.tipo(), request.estoque());
+    }
+
+    @Transactional
+    public Item criarProduto(CriarProdutoRequest request) {
+        return criar(request.nome(), request.preco(), TipoItem.PRODUTO, request.estoque());
+    }
+
+    @Transactional
+    public Item criarServico(CriarServicoRequest request) {
+        return criar(request.nome(), request.preco(), TipoItem.SERVICO, null);
+    }
+
+    private Item criar(String nome, java.math.BigDecimal preco, TipoItem tipo, Integer estoque) {
+        validarEstoque(tipo, estoque);
+        validarNomeDisponivel(nome, null);
 
         Item item = new Item();
-        item.setNome(normalizarNome(request.nome()));
-        item.setTipo(request.tipo());
-        item.setPreco(request.preco());
-        item.setEstoque(request.estoque());
+        item.setNome(normalizarNome(nome));
+        item.setTipo(tipo);
+        item.setPreco(preco);
+        item.setEstoque(estoque);
         return salvar(item);
     }
 
@@ -79,16 +96,13 @@ public class ItemService {
     @Transactional
     public Item atualizar(UUID id, AtualizarItemRequest request) {
         Item item = buscar(id);
-        if (request.tipo() == TipoItem.SERVICO && item.getEstoque() != null) {
-            throw new ItemConflictException("Não é possível transformar produto com estoque em serviço");
-        }
-        if (request.tipo() == TipoItem.PRODUTO && item.getEstoque() == null) {
-            throw new ItemValidationException("Produto deve possuir estoque");
-        }
+        Integer estoqueAtualizado = request.estoqueInformado() ? request.estoque() : item.getEstoque();
+        validarEstoque(request.tipo(), estoqueAtualizado);
         validarNomeDisponivel(request.nome(), id);
         item.setNome(normalizarNome(request.nome()));
         item.setTipo(request.tipo());
         item.setPreco(request.preco());
+        item.setEstoque(estoqueAtualizado);
         return salvar(item);
     }
 
@@ -97,6 +111,24 @@ public class ItemService {
         Item item = buscar(id);
         item.setAtivo(ativo);
         return itemRepository.saveAndFlush(item);
+    }
+
+    @Transactional
+    public void excluir(UUID id) {
+        Item item = buscar(id);
+        if (itemVendaRepository.existsByItemId(id)) {
+            throw new ItemConflictException(
+                    "Item possui histórico de vendas e não pode ser excluído. Inative o item para impedir novos usos."
+            );
+        }
+        try {
+            itemRepository.delete(item);
+            itemRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new ItemConflictException(
+                    "Item possui vínculos e não pode ser excluído. Inative o item para impedir novos usos."
+            );
+        }
     }
 
     private void validarEstoque(TipoItem tipo, Integer estoque) {

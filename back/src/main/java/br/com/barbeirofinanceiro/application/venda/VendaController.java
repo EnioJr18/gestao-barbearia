@@ -4,8 +4,10 @@ import br.com.barbeirofinanceiro.domain.venda.StatusVenda;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,6 +38,18 @@ public class VendaController {
     @GetMapping("/{id}")
     public VendaResponse buscar(@PathVariable UUID id) {
         return service.buscarComResposta(id);
+    }
+
+    @PutMapping("/{id}")
+    public VendaResponse atualizar(@PathVariable UUID id,
+                                   @Valid @RequestBody CriarVendaRequest request) {
+        return service.atualizarComResposta(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable UUID id) {
+        service.excluir(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

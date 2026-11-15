@@ -1,11 +1,12 @@
 import { type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  FiActivity,
   FiBarChart2,
   FiBox,
+  FiDollarSign,
   FiGrid,
   FiLogOut,
+  FiScissors,
   FiShoppingBag,
   FiUsers,
 } from 'react-icons/fi'
@@ -14,7 +15,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -25,13 +25,16 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { useMeUser } from '@/hooks/user/useMeUser'
+import { useCurrentCaixa } from '@/hooks/caixa/useCurrentCaixa'
 
 const links = [
   { to: '/dashboard', label: 'Visão geral', icon: FiGrid },
-  { to: '/produtos', label: 'Produtos e serviços', icon: FiBox },
-  { to: '/clientes', label: 'Clientes', icon: FiUsers },
-  { to: '/pedidos', label: 'Pedidos', icon: FiShoppingBag },
   { to: '/relatorios', label: 'Relatórios', icon: FiBarChart2 },
+  { to: '/caixa', label: 'Caixa', icon: FiDollarSign },
+  { to: '/produtos', label: 'Produtos', icon: FiBox },
+  { to: '/servicos', label: 'Serviços', icon: FiScissors },
+  { to: '/pedidos', label: 'Pedidos', icon: FiShoppingBag },
+  { to: '/clientes', label: 'Clientes', icon: FiUsers },
 ]
 
 function getInitials(name: string) {
@@ -50,8 +53,27 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { data: user } = useMeUser()
-  const current = links.find((link) => link.to === location.pathname)
+  const { data: caixa, isLoading: caixaLoading, error: caixaError } =
+    useCurrentCaixa()
+  const current = links.find((link) =>
+    location.pathname === '/'
+      ? link.to === '/dashboard'
+      : link.to === location.pathname,
+  )
   const userName = user?.nome ?? 'Usuário'
+  const caixaStatusLabel = caixaLoading
+    ? 'Carregando...'
+    : caixaError
+      ? 'Indisponível'
+      : caixa?.status === 'ABERTO'
+        ? 'Aberto'
+        : 'Fechado'
+  const caixaStatusColor =
+    caixaLoading
+      ? 'bg-muted-foreground'
+      : caixa?.status === 'ABERTO'
+        ? 'bg-emerald-500'
+        : 'bg-red-500'
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -60,41 +82,38 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar collapsible="icon">
-        <SidebarHeader>
-          <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-            <div className="grid size-8 shrink-0 place-items-center rounded-lg rounded-bl-sm bg-primary font-heading text-lg font-bold text-primary-foreground">
-              C
+    <SidebarProvider className='bg-[#0c0806]'>
+      <Sidebar collapsible="icon" className="border-sidebar-border">
+        <SidebarHeader className="px-5 py-5 group-data-[collapsible=icon]:px-0">
+          <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center">
+            <div className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-xl font-bold text-primary-foreground">
+              <FiScissors />
             </div>
             <div className="group-data-[collapsible=icon]:hidden">
-              <strong className="font-heading text-xl">
-                Corte <span className="text-amber-600">& Cia</span>
+              <strong className="font-heading text-base tracking-tight">
+                Barbearia Neves
               </strong>
-              <span className="block text-sm text-muted-foreground">
-                gestão inteligente
+              <span className="block text-[14px] text-muted-foreground">
+                Gestão da barbearia
               </span>
             </div>
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-sm font-semibold tracking-wide">
-              MENU PRINCIPAL
-            </SidebarGroupLabel>
-            <SidebarMenu>
-              {links.map(({ to, label, icon: Icon }) => (
+          <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+              {links.map(({ to, label, icon: Icon}) => (
                 <SidebarMenuItem key={to}>
                   <SidebarMenuButton
                     render={<NavLink to={to} />}
                     isActive={current?.to === to}
                     tooltip={label}
-                    className="justify-start text-base [&_svg]:size-5 group-data-[collapsible=icon]:justify-center"
+                    className="h-11 justify-start gap-3 rounded-lg px-3 text-sm font-medium hover:bg-primary/20 hover:text-primary data-active:bg-primary data-active:font-semibold data-active:text-primary-foreground data-active:shadow-[0_0_0_1px_var(--primary),0_4px_14px_color-mix(in_oklab,var(--primary)_30%,transparent)] [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                   >
-                    <span className="flex size-5 shrink-0 items-center justify-center">
+                    <span className="flex size-6 shrink-0 items-center justify-center">
                       <Icon />
                     </span>
-                    <span className="group-data-[collapsible=icon]:hidden">
+                    <span className="group-data-[collapsible=icon]:hidden text-[18px] font-medium">
                       {label}
                     </span>
                   </SidebarMenuButton>
@@ -102,24 +121,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
               ))}
             </SidebarMenu>
           </SidebarGroup>
-          <SidebarGroup className="mt-auto group-data-[collapsible=icon]:hidden">
-            <div className="grid gap-1 rounded-lg bg-amber-50 p-3 text-amber-950">
-              <FiActivity className="size-5 text-amber-600" />
-              <strong className="text-sm">Seu negócio em movimento</strong>
-              <span className="text-xs leading-4 text-amber-800/70">
-                Acompanhe seus resultados todos os dias.
-              </span>
-            </div>
-          </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu className="gap-2">
+        <SidebarFooter className="p-4">
+          <div className="mb-3 rounded-xl bg-sidebar-accent p-3 group-data-[collapsible=icon]:hidden">
+            <span className="block text-[14px] text-muted-foreground">Status do caixa</span>
+            <span className="mt-1 flex items-center gap-1.5 text-[14px] font-semibold">
+              <span className={`size-3 rounded-full ${caixaStatusColor}`} />
+              {caixaStatusLabel}
+            </span>
+          </div>
+          <SidebarMenu className="gap-2 group-data-[collapsible=icon]:items-center">
             <SidebarMenuItem>
               <SidebarMenuButton
                 size="lg"
-                className="justify-start gap-3 text-base [&_svg]:size-5 group-data-[collapsible=icon]:justify-center"
+                className="justify-start gap-3 text-sm [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
               >
-                <div className="grid size-7 shrink-0 place-items-center rounded-full bg-emerald-100 text-[10px] font-bold text-primary">
+                <div className="grid size-8 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-primary">
                   {getInitials(userName)}
                 </div>
                 <span className="min-w-0 group-data-[collapsible=icon]:hidden">
@@ -136,10 +153,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <SidebarMenuButton
                 type="button"
                 onClick={handleLogout}
-                className="justify-start text-base text-red-700 hover:bg-red-50 hover:text-red-800 [&_svg]:size-5 group-data-[collapsible=icon]:justify-center"
+                className="justify-start text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground [&_svg]:size-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                 tooltip="Sair"
               >
-                <span className="flex size-5 shrink-0 items-center justify-center">
+                <span className="flex size-6 shrink-0 items-center justify-center">
                   <FiLogOut />
                 </span>
                 <span className="group-data-[collapsible=icon]:hidden">
@@ -152,12 +169,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <SidebarRail />
       </Sidebar>
       <SidebarInset>
-        <main className="min-h-[calc(100vh-4rem)] bg-muted/30">
+        <main className="min-h-svh bg-[#110e0b]">
           <SidebarTrigger
-            className="size-10 [&_svg]:size-5 m-3 text-2xl"
+            className="m-3 size-10 text-2xl [&_svg]:size-5"
             aria-label="Abrir ou fechar menu"
           />
-          <div className="mx-auto w-full p-4 md:px-15 md:py-5 xl:px-30">
+          <div className="mx-auto w-full px-10 py-6 bg-[#110e0b]">
             {children}
           </div>
         </main>
