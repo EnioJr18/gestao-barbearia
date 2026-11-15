@@ -17,6 +17,7 @@ import java.util.UUID;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -111,12 +112,18 @@ class ClienteControllerIntegrationTest extends PostgresPersistenceTest {
     }
 
     @Test
-    void deveInativarEAtivarCliente() throws Exception {
+    void deveInativarCliente() throws Exception {
         UUID id = criar("João", null);
 
         inativar(id);
         mockMvc.perform(get("/api/v1/clientes").param("ativo", "true").with(user(USERNAME)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void deveReativarCliente() throws Exception {
+        UUID id = criar("João", null);
+        inativar(id);
 
         mockMvc.perform(patch("/api/v1/clientes/{id}/ativar", id).with(csrf()).with(user(USERNAME)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.ativo").value(true));
@@ -129,6 +136,18 @@ class ClienteControllerIntegrationTest extends PostgresPersistenceTest {
 
         mockMvc.perform(get("/api/v1/clientes").param("ativo", "true").with(user(USERNAME)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void deveExcluirClienteSemHistoricoQuandoSolicitado() throws Exception {
+        UUID id = criar("Cliente avulso", null);
+
+        mockMvc.perform(delete("/api/v1/clientes/{id}", id)
+                        .with(csrf()).with(user(USERNAME)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/clientes/{id}", id).with(user(USERNAME)))
+                .andExpect(status().isNotFound());
     }
 
     private UUID criar(String nome, String telefone) throws Exception {

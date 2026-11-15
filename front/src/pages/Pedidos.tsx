@@ -7,16 +7,18 @@ import {
   FiTrash2,
   FiMinus,
   FiX,
+  FiXCircle,
 } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useAllClientes } from '@/hooks/cliente/useAllClientes'
-import { useAllItens } from '@/hooks/item/useAllItens'
+import { useCompleteItens } from '@/hooks/item/useCompleteItens'
 import { useAllVendas } from '@/hooks/venda/useAllVendas'
 import { useCreateVenda } from '@/hooks/venda/useCreateVenda'
 import { useUpdateVenda } from '@/hooks/venda/useUpdateVenda'
-import { useDeleteVenda } from '@/hooks/venda/useDeleteVenda'
+import { useCancelVenda } from '@/hooks/venda/useCancelVenda'
 import type { FormaPagamento } from '@/hooks/venda/types'
+import { getApiErrorMessage } from '@/services/apiError'
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
@@ -35,17 +37,23 @@ export function Pedidos() {
   const [search, setSearch] = useState('')
   const [clientId, setClientId] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
+  const [historicalPrices, setHistoricalPrices] = useState<Record<string, number>>({})
   const [payment, setPayment] = useState<FormaPagamento>('PIX')
   const { data: orders = [], isLoading, error } = useAllVendas()
   const { data: clients = [] } = useAllClientes({ ativo: true })
-  const { data: items = [] } = useAllItens({ ativo: true })
+  const {
+    data: items = [],
+    isLoading: itemsLoading,
+    error: itemsError,
+  } = useCompleteItens()
   const createVendaMutation = useCreateVenda()
   const updateVendaMutation = useUpdateVenda()
-  const deleteVendaMutation = useDeleteVenda()
+  const cancelVendaMutation = useCancelVenda()
   const itemById = useMemo(
     () => new Map(items.map((item) => [item.id, item])),
     [items],
   )
+  const activeItems = useMemo(() => items.filter((item) => item.ativo), [items])
   const clientById = useMemo(
     () => new Map(clients.map((client) => [client.id, client])),
     [clients],
@@ -58,22 +66,39 @@ export function Pedidos() {
   })
   const cartItems = items.filter((item) => cart[item.id])
   const total = cartItems.reduce(
-    (sum, item) => sum + Number(item.preco) * cart[item.id],
+    (sum, item) =>
+      sum + (historicalPrices[item.id] ?? Number(item.preco)) * cart[item.id],
     0,
   )
 
-  const addItem = (id: string) =>
+  const addItem = (id: string) => {
+    if (!itemById.get(id)?.ativo) return
     setCart((current) => ({ ...current, [id]: (current[id] ?? 0) + 1 }))
-  const removeItem = (id: string) =>
+  }
+  const removeCartItem = (id: string) => {
     setCart((current) => {
-      const quantity = (current[id] ?? 0) - 1
-      if (quantity <= 0) {
-        const next = { ...current }
-        delete next[id]
-        return next
-      }
-      return { ...current, [id]: quantity }
+      const next = { ...current }
+      delete next[id]
+      return next
     })
+  }
+
+  const removeItem = (id: string) => {
+    if ((cart[id] ?? 0) <= 1) {
+      removeCartItem(id)
+      return
+    }
+    setCart((current) => ({ ...current, [id]: current[id] - 1 }))
+  }
+
+  const openNewOrder = () => {
+    setEditingId(null)
+    setClientId('')
+    setCart({})
+    setHistoricalPrices({})
+    setPayment('PIX')
+    setForm(true)
+  }
 
   const submit = () => {
     if (!cartItems.length || total <= 0) return
@@ -82,7 +107,7 @@ export function Pedidos() {
       itens: cartItems.map((item) => ({ itemId: item.id, quantidade: cart[item.id] })),
       pagamentos: [{ formaPagamento: payment, valor: total }],
     }
-    const options = { onSuccess: () => { setForm(false); setEditingId(null); setClientId(''); setCart({}); setPayment('PIX') } }
+    const options = { onSuccess: () => { setForm(false); setEditingId(null); setClientId(''); setCart({}); setHistoricalPrices({}); setPayment('PIX') } }
     if (editingId) updateVendaMutation.mutate({ id: editingId, payload }, options)
     else createVendaMutation.mutate(payload, options)
   }
@@ -91,6 +116,7 @@ export function Pedidos() {
     setEditingId(order.id)
     setClientId(order.clienteId ?? '')
     setCart(Object.fromEntries(order.itens.map((line) => [line.itemId, line.quantidade])))
+    setHistoricalPrices(Object.fromEntries(order.itens.map((line) => [line.itemId, Number(line.precoUnitario)])))
     setPayment(order.pagamentos[0]?.formaPagamento ?? 'PIX')
     setForm(true)
   }
@@ -112,7 +138,7 @@ export function Pedidos() {
         <Button
           size="lg"
           className="h-12 rounded-xl px-5 text-lg [&_svg:not([class*='size-'])]:size-5"
-          onClick={() => setForm(!form)}
+          onClick={openNewOrder}
         >
           <FiPlus /> Novo pedido
         </Button>
@@ -144,32 +170,40 @@ export function Pedidos() {
             </div>
             <div className="grid gap-10 lg:grid-cols-[1fr_1fr]">
               <div className="space-y-7">
-                {(['SERVICO', 'PRODUTO'] as const).map((type) => (
-                  <section key={type}>
-                    <h3 className="mb-3 text-lg font-bold uppercase tracking-wider text-muted-foreground">
-                      {type === 'SERVICO' ? 'Serviços' : 'Produtos'}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {items
-                        .filter((item) => item.tipo === type)
-                        .map((item) => (
-                          <button
-                            type="button"
-                            key={item.id}
-                            onClick={() => addItem(item.id)}
-                            className="rounded-xl bg-muted/80 p-4 text-left transition-colors hover:bg-primary/15"
-                          >
-                            <span className="block text-xl font-semibold">
-                              {item.nome}
-                            </span>
-                            <span className="text-lg text-primary">
-                              {formatCurrency(Number(item.preco))}
-                            </span>
-                          </button>
-                        ))}
-                    </div>
-                  </section>
-                ))}
+                {itemsLoading ? (
+                  <p className="text-lg text-muted-foreground">Carregando itens...</p>
+                ) : itemsError ? (
+                  <p className="text-lg text-red-600">Não foi possível carregar os itens.</p>
+                ) : activeItems.length === 0 ? (
+                  <p className="text-lg text-muted-foreground">Nenhum item ativo disponível.</p>
+                ) : (
+                  (['SERVICO', 'PRODUTO'] as const).map((type) => (
+                    <section key={type}>
+                      <h3 className="mb-3 text-lg font-bold uppercase tracking-wider text-muted-foreground">
+                        {type === 'SERVICO' ? 'Serviços' : 'Produtos'}
+                      </h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        {activeItems
+                          .filter((item) => item.tipo === type)
+                          .map((item) => (
+                            <button
+                              type="button"
+                              key={item.id}
+                              onClick={() => addItem(item.id)}
+                              className="rounded-xl bg-muted/80 p-4 text-left transition-colors hover:bg-primary/15"
+                            >
+                              <span className="block text-xl font-semibold">
+                                {item.nome}
+                              </span>
+                              <span className="text-lg text-primary">
+                                {formatCurrency(Number(item.preco))}
+                              </span>
+                            </button>
+                          ))}
+                      </div>
+                    </section>
+                  ))
+                )}
               </div>
               <div className="space-y-6">
                 <label className="grid gap-2 text-lg font-semibold">
@@ -196,15 +230,15 @@ export function Pedidos() {
                       >
                         <span className="min-w-0 flex-1 truncate text-xl font-semibold">
                           {item.nome}
+                          <small className="block text-sm font-normal text-muted-foreground">
+                            {formatCurrency(historicalPrices[item.id] ?? Number(item.preco))}
+                            {!item.ativo ? ' · Item inativo' : ''}
+                          </small>
                         </span>
                         <button
                           type="button"
                           aria-label={`Remover ${item.nome}`}
-                          onClick={() => setCart((current) => {
-                            const next = { ...current }
-                            delete next[item.id]
-                            return next
-                          })}
+                          onClick={() => removeCartItem(item.id)}
                         >
                           <FiTrash2 className="size-5 text-muted-foreground" />
                         </button>
@@ -214,11 +248,13 @@ export function Pedidos() {
                         <span className="w-8 text-center text-2xl font-bold text-primary">
                           {cart[item.id]}
                         </span>
-                        <button type="button" onClick={() => addItem(item.id)}>
+                        <button type="button" disabled={!item.ativo} onClick={() => addItem(item.id)}>
                           <FiPlus className="size-5" />
                         </button>
                         <strong className="w-28 text-right text-lg">
-                          {formatCurrency(Number(item.preco) * cart[item.id])}
+                          {formatCurrency(
+                            (historicalPrices[item.id] ?? Number(item.preco)) * cart[item.id],
+                          )}
                         </strong>
                       </div>
                     ))
@@ -270,7 +306,13 @@ export function Pedidos() {
                     type="button"
                     className="h-12 px-6 text-lg"
                     onClick={submit}
-                    disabled={createVendaMutation.isPending || !cartItems.length}
+                    disabled={
+                      createVendaMutation.isPending ||
+                      updateVendaMutation.isPending ||
+                      itemsLoading ||
+                      Boolean(itemsError) ||
+                      !cartItems.length
+                    }
                   >
                     {createVendaMutation.isPending || updateVendaMutation.isPending ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Finalizar venda'}
                   </Button>
@@ -281,6 +323,14 @@ export function Pedidos() {
         </div>
       )}
       <Card className="overflow-hidden rounded-xl border shadow-sm">
+        {cancelVendaMutation.error && (
+          <p className="border-b px-5 py-3 text-base text-red-600">
+            {getApiErrorMessage(
+              cancelVendaMutation.error,
+              'Não foi possível cancelar o pedido.',
+            )}
+          </p>
+        )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
             <FiSearch />
@@ -367,7 +417,18 @@ export function Pedidos() {
                     <td>
                       <div className="flex items-center gap-2">
                         <button type="button" title="Editar" aria-label="Editar pedido" disabled={order.status !== 'FINALIZADA'} onClick={() => editOrder(order)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-amber-500/15 hover:text-amber-300"><FiEdit2 /></button>
-                        <button type="button" title="Excluir" aria-label="Excluir pedido" disabled={order.status !== 'FINALIZADA' || deleteVendaMutation.isPending} onClick={() => window.confirm(`Excluir o pedido #${order.id.slice(0, 8)}?`) && deleteVendaMutation.mutate(order.id)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"><FiTrash2 /></button>
+                        <button
+                          type="button"
+                          title="Cancelar"
+                          aria-label="Cancelar pedido"
+                          disabled={order.status !== 'FINALIZADA' || cancelVendaMutation.isPending}
+                          onClick={() => window.confirm(
+                            `Cancelar o pedido #${order.id.slice(0, 8)}? O cancelamento preserva o histórico e não poderá ser desfeito pelo fluxo normal.`,
+                          ) && cancelVendaMutation.mutate(order.id)}
+                          className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"
+                        >
+                          <FiXCircle />
+                        </button>
                       </div>
                     </td>
                   </tr>

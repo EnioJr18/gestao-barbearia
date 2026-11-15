@@ -1,4 +1,4 @@
-package br.com.barbeirofinanceiro.application.cliente;
+package br.com.barbeirofinanceiro.domain.cliente;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -9,4 +9,5 @@ public record ClienteResumoProjection(
         long visitas,
         BigDecimal totalGasto,
         LocalDate ultimaVisita
-) {}
+) {
+}

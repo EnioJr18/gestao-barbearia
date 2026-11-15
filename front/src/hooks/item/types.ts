@@ -33,11 +33,13 @@ export interface AtualizarItemRequest {
   nome: string
   tipo: TipoItem
   preco: number
-  estoque: number | null
+  estoque?: number | null
 }
 
 export interface ListItensParams {
   tipo?: TipoItem
   ativo?: boolean
   nome?: string
+  page?: number
+  size?: number
 }

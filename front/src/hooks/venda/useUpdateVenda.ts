@@ -20,6 +20,8 @@ export const useUpdateVenda = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
       queryClient.invalidateQueries({ queryKey: ['itens'] })
+      queryClient.invalidateQueries({ queryKey: ['caixa'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

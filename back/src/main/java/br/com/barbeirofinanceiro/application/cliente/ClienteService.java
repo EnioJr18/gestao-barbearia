@@ -2,6 +2,8 @@ package br.com.barbeirofinanceiro.application.cliente;
 
 import br.com.barbeirofinanceiro.domain.cliente.Cliente;
 import br.com.barbeirofinanceiro.domain.cliente.ClienteRepository;
+import br.com.barbeirofinanceiro.domain.cliente.ClienteResumoProjection;
+import br.com.barbeirofinanceiro.domain.venda.VendaRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -18,9 +20,11 @@ import java.util.stream.Collectors;
 @Service
 public class ClienteService {
     private final ClienteRepository clienteRepository;
+    private final VendaRepository vendaRepository;
 
-    public ClienteService(ClienteRepository clienteRepository) {
+    public ClienteService(ClienteRepository clienteRepository, VendaRepository vendaRepository) {
         this.clienteRepository = clienteRepository;
+        this.vendaRepository = vendaRepository;
     }
 
     @Transactional
@@ -83,11 +87,18 @@ public class ClienteService {
     @Transactional
     public void excluir(UUID id) {
         Cliente cliente = buscar(id);
+        if (vendaRepository.existsByClienteId(id)) {
+            throw new ClienteConflictException(
+                    "Cliente possui histórico de vendas e não pode ser excluído. Inative o cliente para impedir novos usos."
+            );
+        }
         try {
             clienteRepository.delete(cliente);
             clienteRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            throw new ClienteConflictException("Cliente possui pedidos vinculados e não pode ser excluído");
+            throw new ClienteConflictException(
+                    "Cliente possui vínculos e não pode ser excluído. Inative o cliente para impedir novos usos."
+            );
         }
     }
 

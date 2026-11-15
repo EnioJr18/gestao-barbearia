@@ -1,5 +1,6 @@
 package br.com.barbeirofinanceiro.application.cliente;
 
+import br.com.barbeirofinanceiro.domain.cliente.ClienteResumoProjection;
 import br.com.barbeirofinanceiro.domain.cliente.Cliente;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

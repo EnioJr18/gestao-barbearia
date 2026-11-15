@@ -18,6 +18,21 @@ public interface VendaPagamentoRepository extends JpaRepository<VendaPagamento, 
     List<VendaPagamento> findByVendaIdIn(Collection<UUID> vendaIds);
 
     @Query("""
+        SELECT new br.com.barbeirofinanceiro.domain.venda.PagamentoCaixaResumoProjection(
+            p.venda.caixa.id,
+            p.formaPagamento,
+            SUM(p.valor)
+        )
+        FROM VendaPagamento p
+        WHERE p.venda.caixa.id IN :caixaIds
+          AND p.venda.status = br.com.barbeirofinanceiro.domain.venda.StatusVenda.FINALIZADA
+        GROUP BY p.venda.caixa.id, p.formaPagamento
+        """)
+    List<PagamentoCaixaResumoProjection> buscarTotaisPorCaixas(
+            @Param("caixaIds") Collection<UUID> caixaIds
+    );
+
+    @Query("""
         SELECT COALESCE(SUM(p.valor), 0)
         FROM VendaPagamento p
         WHERE p.venda.caixa.id = :caixaId

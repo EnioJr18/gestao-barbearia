@@ -8,12 +8,14 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { PaginationControls } from '@/components/PaginationControls'
 import { useAllItens } from '@/hooks/item/useAllItens'
 import { useCreateProduto } from '@/hooks/item/useCreateProduto'
 import { useInactiveItem } from '@/hooks/item/useInactiveItem'
 import { useActiveItem } from '@/hooks/item/useActiveItem'
 import { useUpdateItem } from '@/hooks/item/useUpdateItem'
 import { useDeleteItem } from '@/hooks/item/useDeleteItem'
+import { getApiErrorMessage } from '@/services/apiError'
 
 const schema = z.object({
   nome: z.string().min(2, 'Informe o nome'),
@@ -42,10 +44,15 @@ export function Produtos() {
   const [modal, setModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const { data: items = [], isLoading, error } = useAllItens({
+  const [page, setPage] = useState(0)
+  const { data, isLoading, error } = useAllItens({
     nome: search || undefined,
     tipo: 'PRODUTO',
+    page,
+    size: 10,
   })
+  const items = data?.content ?? []
+  const currentPage = data?.page ?? page
   const createMutation = useCreateProduto()
   const inactiveMutation = useInactiveItem()
   const activeMutation = useActiveItem()
@@ -85,13 +92,21 @@ export function Produtos() {
         </Button>
       </div>
       <Card className="overflow-hidden rounded-2xl border shadow-sm">
+        {(deleteMutation.error || activeMutation.error || inactiveMutation.error) && (
+          <p className="border-b px-6 py-3 text-base text-red-600">
+            {getApiErrorMessage(
+              deleteMutation.error ?? activeMutation.error ?? inactiveMutation.error,
+              'Não foi possível concluir a ação no produto.',
+            )}
+          </p>
+        )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
             <FiSearch />
             <input
               placeholder="Buscar produto"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => { setSearch(event.target.value); setPage(0) }}
               className="w-full bg-transparent text-lg outline-none"
             />
           </div>
@@ -132,13 +147,19 @@ export function Produtos() {
                   </td>
                   <td className="px-6 py-6"><div className="flex items-center gap-2">
                     <button type="button" title="Editar" aria-label="Editar produto" onClick={() => editProduct(item)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-amber-500/15 hover:text-amber-300"><FiEdit2 /></button>
-                    <button type="button" title="Excluir" aria-label="Excluir produto" disabled={deleteMutation.isPending} onClick={() => window.confirm(`Excluir ${item.nome}?`) && deleteMutation.mutate(item.id)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"><FiTrash2 /></button>
+                    <button type="button" title="Excluir permanentemente" aria-label="Excluir produto permanentemente" disabled={deleteMutation.isPending} onClick={() => window.confirm(`Excluir permanentemente ${item.nome}? Esta ação é irreversível. Produtos com histórico devem ser inativados.`) && deleteMutation.mutate(item.id)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"><FiTrash2 /></button>
                   </div></td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+        <PaginationControls
+          page={currentPage}
+          totalPages={data?.totalPages ?? 0}
+          totalElements={data?.totalElements ?? 0}
+          onPageChange={setPage}
+        />
       </Card>
       {modal && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-5" onMouseDown={() => setModal(false)}>

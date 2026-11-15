@@ -3,23 +3,29 @@ package br.com.barbeirofinanceiro.application.item;
 import br.com.barbeirofinanceiro.domain.item.Item;
 import br.com.barbeirofinanceiro.domain.item.ItemRepository;
 import br.com.barbeirofinanceiro.domain.item.TipoItem;
+import br.com.barbeirofinanceiro.domain.venda.ItemVendaRepository;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
-
 @Service
 public class ItemService {
-    private final ItemRepository itemRepository;
+    private static final int MAX_PAGE_SIZE = 100;
 
-    public ItemService(ItemRepository itemRepository) {
+    private final ItemRepository itemRepository;
+    private final ItemVendaRepository itemVendaRepository;
+
+    public ItemService(ItemRepository itemRepository, ItemVendaRepository itemVendaRepository) {
         this.itemRepository = itemRepository;
+        this.itemVendaRepository = itemVendaRepository;
     }
 
     @Transactional
@@ -50,7 +56,9 @@ public class ItemService {
     }
 
     @Transactional(readOnly = true)
-    public List<Item> listar(TipoItem tipo, Boolean ativo, String nome) {
+    public Page<Item> listar(TipoItem tipo, Boolean ativo, String nome, int page, int size) {
+        validarPaginacao(page, size);
+
         Specification<Item> specification = (root, query, builder) -> builder.conjunction();
         if (tipo != null) {
             specification = specification.and((root, query, builder) -> builder.equal(root.get("tipo"), tipo));
@@ -63,7 +71,20 @@ public class ItemService {
             specification = specification.and((root, query, builder) ->
                     builder.like(builder.lower(root.get("nome")), termo));
         }
-        return itemRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "nome"));
+        Sort sort = Sort.by(Sort.Direction.ASC, "nome");
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Item> resultado = itemRepository.findAll(specification, pageable);
+
+        if (resultado.getTotalElements() == 0) {
+            return Page.empty(PageRequest.of(0, size, sort));
+        }
+
+        if (page >= resultado.getTotalPages()) {
+            int ultimaPagina = resultado.getTotalPages() - 1;
+            return itemRepository.findAll(specification, PageRequest.of(ultimaPagina, size, sort));
+        }
+
+        return resultado;
     }
 
     @Transactional(readOnly = true)
@@ -75,12 +96,13 @@ public class ItemService {
     @Transactional
     public Item atualizar(UUID id, AtualizarItemRequest request) {
         Item item = buscar(id);
-        validarEstoque(request.tipo(), request.estoque());
+        Integer estoqueAtualizado = request.estoqueInformado() ? request.estoque() : item.getEstoque();
+        validarEstoque(request.tipo(), estoqueAtualizado);
         validarNomeDisponivel(request.nome(), id);
         item.setNome(normalizarNome(request.nome()));
         item.setTipo(request.tipo());
         item.setPreco(request.preco());
-        item.setEstoque(request.estoque());
+        item.setEstoque(estoqueAtualizado);
         return salvar(item);
     }
 
@@ -94,11 +116,18 @@ public class ItemService {
     @Transactional
     public void excluir(UUID id) {
         Item item = buscar(id);
+        if (itemVendaRepository.existsByItemId(id)) {
+            throw new ItemConflictException(
+                    "Item possui histórico de vendas e não pode ser excluído. Inative o item para impedir novos usos."
+            );
+        }
         try {
             itemRepository.delete(item);
             itemRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            throw new ItemConflictException("Item possui pedidos vinculados e não pode ser excluído");
+            throw new ItemConflictException(
+                    "Item possui vínculos e não pode ser excluído. Inative o item para impedir novos usos."
+            );
         }
     }
 
@@ -129,5 +158,14 @@ public class ItemService {
 
     private String normalizarNome(String nome) {
         return nome.trim();
+    }
+
+    private void validarPaginacao(int page, int size) {
+        if (page < 0) {
+            throw new ItemValidationException("page deve ser maior ou igual a zero");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ItemValidationException("size deve estar entre 1 e " + MAX_PAGE_SIZE);
+        }
     }
 }

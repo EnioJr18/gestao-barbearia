@@ -14,6 +14,8 @@ public interface ItemVendaRepository extends JpaRepository<ItemVenda, UUID> {
 
     List<ItemVenda> findByVendaId(UUID vendaId);
 
+    boolean existsByItemId(UUID itemId);
+
     @Query("""
         SELECT iv
         FROM ItemVenda iv

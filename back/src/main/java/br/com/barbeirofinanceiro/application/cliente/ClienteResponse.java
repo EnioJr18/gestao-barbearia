@@ -1,6 +1,7 @@
 package br.com.barbeirofinanceiro.application.cliente;
 
 import br.com.barbeirofinanceiro.domain.cliente.Cliente;
+import br.com.barbeirofinanceiro.domain.cliente.ClienteResumoProjection;
 
 import java.time.Instant;
 import java.util.UUID;

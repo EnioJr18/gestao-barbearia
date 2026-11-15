@@ -35,6 +35,17 @@ Copy-Item .env.example .env
 
 `.env.example` contém apenas placeholders. Nunca versione `.env`, senhas ou `JWT_SECRET`.
 
+Para apontar o frontend para outro endereço da API, copie o modelo específico do Vite:
+
+```powershell
+Copy-Item front/.env.example front/.env.local
+```
+
+Configure `VITE_API_URL` com a URL completa da API, incluindo `/api/v1`. Quando a
+variável não é definida, o frontend usa `http://localhost:8080/api/v1`, mantendo o
+comportamento padrão de desenvolvimento. Variáveis `VITE_*` são incorporadas ao
+bundle do navegador e não devem conter segredos.
+
 `JWT_SECRET` é obrigatório e precisa ter pelo menos 32 bytes UTF-8. No PowerShell, um valor aleatório pode ser gerado assim:
 
 ```powershell

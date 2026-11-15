@@ -11,8 +11,8 @@ export interface CaixaResponse {
   debito: number
   credito: number
   valorEsperado: number
-  valorApurado: number
-  diferenca: number
+  valorApurado: number | null
+  diferenca: number | null
   status: StatusCaixa
   usuarioAberturaId: string
   usuarioFechamentoId: string | null

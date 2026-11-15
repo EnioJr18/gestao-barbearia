@@ -11,10 +11,13 @@ import { useCloseCaixa } from '@/hooks/caixa/useCloseCaixa'
 import { useCurrentCaixa } from '@/hooks/caixa/useCurrentCaixa'
 import { useOpenCaixa } from '@/hooks/caixa/useOpenCaixa'
 
-const currency = (value: number | null | undefined) =>
+const currency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-    Number(value ?? 0),
+    value,
   )
+
+const nullableCurrency = (value: number | null) =>
+  value === null ? '—' : currency(value)
 
 const dateTime = (value: string | null) =>
   value
@@ -124,7 +127,7 @@ export function Caixa() {
         </Card>
         <Card className="min-h-40 rounded-2xl p-6">
           <p className="text-base text-muted-foreground">Dinheiro esperado na gaveta</p>
-          <strong className="mt-3 block font-heading text-4xl">{currency(caixa?.valorEsperado)}</strong>
+          <strong className="mt-3 block font-heading text-4xl">{currency(caixa?.valorEsperado ?? 0)}</strong>
           <span className="text-base text-muted-foreground">Fundo + vendas em dinheiro</span>
         </Card>
       </div>
@@ -137,7 +140,7 @@ export function Caixa() {
         ].map(([label, value]) => (
           <Card className="flex min-h-16 items-center justify-between rounded-2xl p-5" key={label as string}>
             <span className="text-lg text-muted-foreground">{label}</span>
-            <strong className="text-lg">{currency(value as number)}</strong>
+            <strong className="text-lg">{currency(Number(value ?? 0))}</strong>
           </Card>
         ))}
       </div>
@@ -149,7 +152,27 @@ export function Caixa() {
             <tbody>
               {historyLoading ? <tr><td colSpan={6} className="text-center text-lg">Carregando histórico...</td></tr> : historyError ? <tr><td colSpan={6} className="text-center text-lg text-red-500">Não foi possível carregar o histórico.</td></tr> : historico.length === 0 ? <tr><td colSpan={6} className="text-center text-lg">Nenhuma sessão registrada.</td></tr> : historico.map((session) => {
                 const vendas = session.dinheiro + session.pix + session.debito + session.credito
-                return <tr key={session.id}><td>{dateTime(session.abertoEm)}</td><td>{dateTime(session.fechadoEm)}</td><td>{currency(vendas)}</td><td>{currency(session.valorEsperado)}</td><td>{currency(session.valorApurado)}</td><td className={session.diferenca >= 0 ? 'text-emerald-500' : 'text-red-500'}>{currency(session.diferenca)}</td></tr>
+                return (
+                  <tr key={session.id}>
+                    <td>{dateTime(session.abertoEm)}</td>
+                    <td>{dateTime(session.fechadoEm)}</td>
+                    <td>{currency(vendas)}</td>
+                    <td>{currency(session.valorEsperado)}</td>
+                    <td title={session.valorApurado === null ? 'Não apurado' : undefined}>
+                      {nullableCurrency(session.valorApurado)}
+                    </td>
+                    <td
+                      className={session.diferenca === null
+                        ? 'text-muted-foreground'
+                        : session.diferenca >= 0
+                          ? 'text-emerald-500'
+                          : 'text-red-500'}
+                      title={session.diferenca === null ? 'Não apurado' : undefined}
+                    >
+                      {nullableCurrency(session.diferenca)}
+                    </td>
+                  </tr>
+                )
               })}
             </tbody>
           </table>

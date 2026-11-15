@@ -19,6 +19,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 import java.util.Optional;
 import java.util.List;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class CaixaService {
@@ -86,8 +89,28 @@ public class CaixaService {
 
     @Transactional(readOnly = true)
     public List<CaixaResponse> listarComResposta() {
-        return caixaRepository.findAllByOrderByDataCaixaDesc().stream()
-                .map(this::resposta)
+        List<Caixa> caixas = caixaRepository.findAllByOrderByDataCaixaDesc();
+        if (caixas.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> caixaIds = caixas.stream().map(Caixa::getId).toList();
+        Map<UUID, Map<FormaPagamento, BigDecimal>> pagamentosPorCaixa = new HashMap<>();
+        vendaPagamentoRepository.buscarTotaisPorCaixas(caixaIds).forEach(resumo ->
+                pagamentosPorCaixa
+                        .computeIfAbsent(resumo.caixaId(), ignored -> new EnumMap<>(FormaPagamento.class))
+                        .put(resumo.formaPagamento(), resumo.valor())
+        );
+        Map<UUID, BigDecimal> despesasPorCaixa = new HashMap<>();
+        movimentacaoRepository.buscarDespesasDinheiroPorCaixas(caixaIds)
+                .forEach(resumo -> despesasPorCaixa.put(resumo.caixaId(), resumo.valor()));
+
+        return caixas.stream()
+                .map(caixa -> resposta(
+                        caixa,
+                        pagamentosPorCaixa.getOrDefault(caixa.getId(), Map.of()),
+                        despesasPorCaixa.getOrDefault(caixa.getId(), BigDecimal.ZERO)
+                ))
                 .toList();
     }
 
@@ -137,24 +160,39 @@ public class CaixaService {
     }
 
     private CaixaResponse resposta(Caixa caixa) {
-        BigDecimal entradas = entradasDinheiro(caixa);
+        BigDecimal dinheiro = entradasDinheiro(caixa);
         BigDecimal saidas = saidasDinheiro(caixa);
-        BigDecimal dinheiro = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
-                caixa.getId(), FormaPagamento.DINHEIRO);
         BigDecimal pix = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
                 caixa.getId(), FormaPagamento.PIX);
         BigDecimal debito = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
                 caixa.getId(), FormaPagamento.CARTAO_DEBITO);
         BigDecimal credito = vendaPagamentoRepository.sumByCaixaIdAndFormaPagamento(
                 caixa.getId(), FormaPagamento.CARTAO_CREDITO);
+        return resposta(caixa, Map.of(
+                FormaPagamento.DINHEIRO, dinheiro,
+                FormaPagamento.PIX, pix,
+                FormaPagamento.CARTAO_DEBITO, debito,
+                FormaPagamento.CARTAO_CREDITO, credito
+        ), saidas);
+    }
+
+    private CaixaResponse resposta(
+            Caixa caixa,
+            Map<FormaPagamento, BigDecimal> pagamentos,
+            BigDecimal saidas
+    ) {
+        BigDecimal dinheiro = pagamentos.getOrDefault(FormaPagamento.DINHEIRO, BigDecimal.ZERO);
+        BigDecimal pix = pagamentos.getOrDefault(FormaPagamento.PIX, BigDecimal.ZERO);
+        BigDecimal debito = pagamentos.getOrDefault(FormaPagamento.CARTAO_DEBITO, BigDecimal.ZERO);
+        BigDecimal credito = pagamentos.getOrDefault(FormaPagamento.CARTAO_CREDITO, BigDecimal.ZERO);
         BigDecimal valorEsperado = caixa.getStatus() == StatusCaixa.FECHADO
                 ? caixa.getValorApurado().subtract(caixa.getDiferenca())
-                : caixa.getValorInicial().add(entradas).subtract(saidas);
+                : caixa.getValorInicial().add(dinheiro).subtract(saidas);
         return new CaixaResponse(
                 caixa.getId(),
                 caixa.getDataCaixa(),
                 caixa.getValorInicial(),
-                entradas,
+                dinheiro,
                 saidas,
                 dinheiro,
                 pix,

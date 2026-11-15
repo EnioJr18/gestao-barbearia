@@ -14,6 +14,8 @@ import java.util.List;
 
 public interface VendaRepository extends JpaRepository<Venda, UUID>, JpaSpecificationExecutor<Venda> {
 
+    boolean existsByClienteId(UUID clienteId);
+
     @Override
     @EntityGraph(attributePaths = {"cliente", "caixa"})
     List<Venda> findAll(Specification<Venda> specification, Sort sort);

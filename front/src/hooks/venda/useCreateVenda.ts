@@ -16,6 +16,7 @@ export const useCreateVenda = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas'] })
       queryClient.invalidateQueries({ queryKey: ['caixa'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

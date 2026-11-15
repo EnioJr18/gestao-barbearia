@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAllClientes } from '@/hooks/cliente/useAllClientes'
 import { useDashboard } from '@/hooks/dashboard/useDashboard'
-import { useAllItens } from '@/hooks/item/useAllItens'
+import { useCompleteItens } from '@/hooks/item/useCompleteItens'
 import { useRelatorios } from '@/hooks/relatorio/useRelatorios'
 import { useAllVendas } from '@/hooks/venda/useAllVendas'
 
@@ -73,7 +73,7 @@ export function Relatorios() {
     status: 'FINALIZADA',
   })
   const clients = useAllClientes({ ativo: true })
-  const items = useAllItens()
+  const items = useCompleteItens()
 
   const clientNames = useMemo(
     () => new Map((clients.data ?? []).map((client) => [client.id, client.nome])),
@@ -122,7 +122,11 @@ export function Relatorios() {
     monthly[0],
   )
   const hasError =
-    report.error || monthDashboard.error || yearDashboard.error || sales.error
+    report.error ||
+    monthDashboard.error ||
+    yearDashboard.error ||
+    sales.error ||
+    items.error
 
   return (
     <>

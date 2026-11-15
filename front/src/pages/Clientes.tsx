@@ -14,6 +14,7 @@ import { useUpdateCliente } from '@/hooks/cliente/useUpdateCliente'
 import { useDeleteCliente } from '@/hooks/cliente/useDeleteCliente'
 import { useActiveCliente } from '@/hooks/cliente/useActiveCliente'
 import { useInactiveCliente } from '@/hooks/cliente/useInactiveCliente'
+import { getApiErrorMessage } from '@/services/apiError'
 
 const schema = z.object({
   nome: z.string().min(3, 'Informe o nome'),
@@ -37,7 +38,7 @@ export function Clientes() {
   const [modal, setModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [buscar, setBuscar] = useState('')
-  const { data: clientes = [], isLoading } = useAllClientes()
+  const { data: clientes = [], isLoading, error } = useAllClientes()
   const createClienteMutation = useCreateCliente()
   const updateClienteMutation = useUpdateCliente()
   const deleteClienteMutation = useDeleteCliente()
@@ -100,6 +101,14 @@ export function Clientes() {
         </Button>
       </div>
       <Card className="overflow-hidden rounded-xl border shadow-sm">
+        {(deleteClienteMutation.error || activeClienteMutation.error || inactiveClienteMutation.error) && (
+          <p className="border-b px-5 py-3 text-base text-red-600">
+            {getApiErrorMessage(
+              deleteClienteMutation.error ?? activeClienteMutation.error ?? inactiveClienteMutation.error,
+              'Não foi possível concluir a ação no cliente.',
+            )}
+          </p>
+        )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
           <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
             <FiSearch />
@@ -144,6 +153,12 @@ export function Clientes() {
                   className="px-5 py-8 text-center text-sm text-muted-foreground"
                 >
                   Carregando clientes...
+                </td>
+              </tr>
+            ) : error ? (
+              <tr>
+                <td colSpan={7} className="px-5 py-8 text-center text-sm text-red-600">
+                  Não foi possível carregar os clientes.
                 </td>
               </tr>
             ) : filteredClientes.length === 0 ? (
@@ -207,7 +222,7 @@ export function Clientes() {
                   <td className="px-5 py-5">
                     <div className="flex items-center gap-2">
                       <button type="button" title="Editar" aria-label="Editar cliente" onClick={() => editCliente(cliente)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-amber-500/15 hover:text-amber-300"><FiEdit2 /></button>
-                      <button type="button" title="Excluir" aria-label="Excluir cliente" disabled={deleteClienteMutation.isPending} onClick={() => window.confirm(`Excluir ${cliente.nome}?`) && deleteClienteMutation.mutate(cliente.id)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"><FiTrash2 /></button>
+                      <button type="button" title="Excluir permanentemente" aria-label="Excluir cliente permanentemente" disabled={deleteClienteMutation.isPending} onClick={() => window.confirm(`Excluir permanentemente ${cliente.nome}? Esta ação é irreversível. Clientes com histórico devem ser inativados.`) && deleteClienteMutation.mutate(cliente.id)} className="rounded-lg border-0 bg-transparent p-2 text-muted-foreground transition-colors hover:bg-red-500/15 hover:text-red-300"><FiTrash2 /></button>
                     </div>
                   </td>
                 </tr>

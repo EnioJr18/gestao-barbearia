@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,7 +75,10 @@ public class VendaService {
         if (caixa.getStatus() != br.com.barbeirofinanceiro.domain.caixa.StatusCaixa.ABERTO) {
             throw new VendaConflictException("Não é possível editar uma venda de caixa fechado");
         }
-        for (ItemVenda linha : itemVendaRepository.findByVendaId(id)) {
+        List<ItemVenda> linhasOriginais = itemVendaRepository.findByVendaId(id);
+        Map<UUID, ItemVenda> linhasOriginaisPorItem = linhasOriginais.stream()
+                .collect(Collectors.toMap(linha -> linha.getItem().getId(), Function.identity()));
+        for (ItemVenda linha : linhasOriginais) {
             Item item = itemRepository.findByIdForUpdate(linha.getItem().getId())
                     .orElseThrow(() -> new VendaNotFoundException("Item não encontrado"));
             if (item.getTipo() == TipoItem.PRODUTO) {
@@ -89,7 +93,7 @@ public class VendaService {
                 != request.itens().size()) {
             throw new VendaValidationException("Não é permitido repetir o mesmo item na venda");
         }
-        itemVendaRepository.deleteAll(itemVendaRepository.findByVendaId(id));
+        itemVendaRepository.deleteAll(linhasOriginais);
         pagamentoRepository.deleteAll(pagamentoRepository.findByVendaId(id));
         itemVendaRepository.flush();
         pagamentoRepository.flush();
@@ -102,7 +106,8 @@ public class VendaService {
             }
             Item item = itemRepository.findByIdForUpdate(itemRequest.itemId())
                     .orElseThrow(() -> new VendaNotFoundException("Item não encontrado"));
-            if (!item.isAtivo()) {
+            ItemVenda linhaOriginal = linhasOriginaisPorItem.get(item.getId());
+            if (!item.isAtivo() && linhaOriginal == null) {
                 throw new VendaConflictException("Item inativo não pode ser vendido");
             }
             if (item.getTipo() == TipoItem.PRODUTO) {
@@ -112,13 +117,14 @@ public class VendaService {
                 item.setEstoque(item.getEstoque() - itemRequest.quantidade());
                 itemRepository.save(item);
             }
-            BigDecimal subtotal = item.getPreco().multiply(BigDecimal.valueOf(itemRequest.quantidade()));
+            BigDecimal precoUnitario = linhaOriginal == null ? item.getPreco() : linhaOriginal.getPrecoUnitario();
+            BigDecimal subtotal = precoUnitario.multiply(BigDecimal.valueOf(itemRequest.quantidade()));
             total = total.add(subtotal);
             ItemVenda linha = new ItemVenda();
             linha.setVenda(venda);
             linha.setItem(item);
             linha.setQuantidade(itemRequest.quantidade());
-            linha.setPrecoUnitario(item.getPreco());
+            linha.setPrecoUnitario(precoUnitario);
             linha.setSubtotal(subtotal);
             linhas.add(linha);
         }
@@ -230,23 +236,12 @@ public class VendaService {
         return resposta(cancelarVenda(id));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public void excluir(UUID id) {
-        Venda venda = carregar(id);
-        for (ItemVenda linha : itemVendaRepository.findByVendaId(id)) {
-            Item item = itemRepository.findByIdForUpdate(linha.getItem().getId())
-                    .orElseThrow(() -> new VendaNotFoundException("Item não encontrado"));
-            if (venda.getStatus() == StatusVenda.FINALIZADA && item.getTipo() == TipoItem.PRODUTO) {
-                item.setEstoque((item.getEstoque() == null ? 0 : item.getEstoque()) + linha.getQuantidade());
-                itemRepository.save(item);
-            }
-        }
-        itemVendaRepository.deleteAll(itemVendaRepository.findByVendaId(id));
-        pagamentoRepository.deleteAll(pagamentoRepository.findByVendaId(id));
-        itemVendaRepository.flush();
-        pagamentoRepository.flush();
-        vendaRepository.delete(venda);
-        vendaRepository.flush();
+        carregar(id);
+        throw new VendaConflictException(
+                "Vendas não podem ser excluídas. Utilize o cancelamento para preservar o histórico financeiro."
+        );
     }
 
     private Venda cancelarVenda(UUID id) {

@@ -1,6 +1,7 @@
 package br.com.barbeirofinanceiro.domain.caixa;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +14,7 @@ import java.util.UUID;
 public interface CaixaRepository extends JpaRepository<Caixa, UUID> {
     Optional<Caixa> findFirstByStatusOrderByDataCaixaDesc(StatusCaixa status);
 
+    @EntityGraph(attributePaths = {"usuarioAbertura", "usuarioFechamento"})
     List<Caixa> findAllByOrderByDataCaixaDesc();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
