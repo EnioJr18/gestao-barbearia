@@ -1,5 +1,7 @@
 package br.com.barbeirofinanceiro.application.caixa;
 
+import br.com.barbeirofinanceiro.application.common.PageResponse;
+import br.com.barbeirofinanceiro.application.common.PageResponseMapper;
 import br.com.barbeirofinanceiro.domain.caixa.Caixa;
 import br.com.barbeirofinanceiro.domain.caixa.CaixaRepository;
 import br.com.barbeirofinanceiro.domain.caixa.StatusCaixa;
@@ -10,6 +12,10 @@ import br.com.barbeirofinanceiro.domain.venda.VendaPagamentoRepository;
 import br.com.barbeirofinanceiro.domain.movimentacao.FormaPagamento;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +31,7 @@ import java.util.Map;
 
 @Service
 public class CaixaService {
+    private static final int MAX_PAGE_SIZE = 100;
     private final CaixaRepository caixaRepository;
     private final UsuarioRepository usuarioRepository;
     private final MovimentacaoRepository movimentacaoRepository;
@@ -88,13 +95,48 @@ public class CaixaService {
     }
 
     @Transactional(readOnly = true)
-    public List<CaixaResponse> listarComResposta() {
-        List<Caixa> caixas = caixaRepository.findAllByOrderByDataCaixaDesc();
-        if (caixas.isEmpty()) {
-            return List.of();
+    public PageResponse<CaixaResponse> listarComResposta(
+            StatusCaixa status,
+            LocalDate dataInicial,
+            LocalDate dataFinal,
+            int page,
+            int size
+    ) {
+        validarConsultaHistorico(dataInicial, dataFinal, page, size);
+
+        Specification<Caixa> specification = (root, query, builder) -> builder.conjunction();
+        if (status != null) {
+            specification = specification.and((root, query, builder) ->
+                    builder.equal(root.get("status"), status));
+        }
+        if (dataInicial != null) {
+            specification = specification.and((root, query, builder) ->
+                    builder.greaterThanOrEqualTo(root.get("dataCaixa"), dataInicial));
+            specification = specification.and((root, query, builder) ->
+                    builder.lessThanOrEqualTo(root.get("dataCaixa"), dataFinal));
         }
 
-        List<UUID> caixaIds = caixas.stream().map(Caixa::getId).toList();
+        Sort sort = Sort.by(
+                Sort.Order.desc("dataCaixa"),
+                Sort.Order.desc("abertoEm"),
+                Sort.Order.desc("id")
+        );
+        PageRequest requestedPage = PageRequest.of(page, size, sort);
+        Page<Caixa> caixas = caixaRepository.findAll(specification, requestedPage);
+        if (caixas.getTotalElements() == 0) {
+            return PageResponseMapper.from(Page.<Caixa>empty(PageRequest.of(0, size, sort)),
+                    caixa -> resposta(caixa, Map.of(), BigDecimal.ZERO));
+        }
+        if (page >= caixas.getTotalPages()) {
+            caixas = caixaRepository.findAll(
+                    specification,
+                    PageRequest.of(caixas.getTotalPages() - 1, size, sort)
+            );
+        }
+
+        List<Caixa> caixasDaPagina = caixas.getContent();
+
+        List<UUID> caixaIds = caixasDaPagina.stream().map(Caixa::getId).toList();
         Map<UUID, Map<FormaPagamento, BigDecimal>> pagamentosPorCaixa = new HashMap<>();
         vendaPagamentoRepository.buscarTotaisPorCaixas(caixaIds).forEach(resumo ->
                 pagamentosPorCaixa
@@ -105,13 +147,31 @@ public class CaixaService {
         movimentacaoRepository.buscarDespesasDinheiroPorCaixas(caixaIds)
                 .forEach(resumo -> despesasPorCaixa.put(resumo.caixaId(), resumo.valor()));
 
-        return caixas.stream()
-                .map(caixa -> resposta(
-                        caixa,
-                        pagamentosPorCaixa.getOrDefault(caixa.getId(), Map.of()),
-                        despesasPorCaixa.getOrDefault(caixa.getId(), BigDecimal.ZERO)
-                ))
-                .toList();
+        return PageResponseMapper.from(caixas, caixa -> resposta(
+                caixa,
+                pagamentosPorCaixa.getOrDefault(caixa.getId(), Map.of()),
+                despesasPorCaixa.getOrDefault(caixa.getId(), BigDecimal.ZERO)
+        ));
+    }
+
+    private void validarConsultaHistorico(
+            LocalDate dataInicial,
+            LocalDate dataFinal,
+            int page,
+            int size
+    ) {
+        if ((dataInicial == null) != (dataFinal == null)) {
+            throw new CaixaValidationException("dataInicial e dataFinal devem ser informadas juntas");
+        }
+        if (dataInicial != null && dataInicial.isAfter(dataFinal)) {
+            throw new CaixaValidationException("dataInicial deve ser anterior ou igual a dataFinal");
+        }
+        if (page < 0) {
+            throw new CaixaValidationException("page deve ser maior ou igual a zero");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new CaixaValidationException("size deve estar entre 1 e " + MAX_PAGE_SIZE);
+        }
     }
 
     @Transactional

@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -82,11 +84,160 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
 
         mockMvc.perform(get("/api/v1/vendas").with(user(USER)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(2)))
-                .andExpect(jsonPath("$[0].itens", org.hamcrest.Matchers.hasSize(1)))
-                .andExpect(jsonPath("$[0].pagamentos", org.hamcrest.Matchers.hasSize(1)))
-                .andExpect(jsonPath("$[1].itens", org.hamcrest.Matchers.hasSize(1)))
-                .andExpect(jsonPath("$[1].pagamentos", org.hamcrest.Matchers.hasSize(1)));
+                .andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.content[0].itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.content[0].pagamentos", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.content[1].itens", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.content[1].pagamentos", org.hamcrest.Matchers.hasSize(1)));
+    }
+
+    @Test void devePaginarComMetadadosOrdenacaoDeterministicaESemRepeticao() throws Exception {
+        UUID item = item("Corte paginado", TipoItem.SERVICO, "30", null);
+        UUID vendaMaisRecente = null;
+        for (int indice = 0; indice < 12; indice++) {
+            UUID venda = persistirVenda(
+                    LocalDate.of(2026, 10, 20).minusDays(indice),
+                    null,
+                    StatusVenda.FINALIZADA,
+                    "30",
+                    item
+            );
+            if (indice == 0) {
+                vendaMaisRecente = venda;
+            }
+        }
+
+        MvcResult primeira = mockMvc.perform(get("/api/v1/vendas").with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(10)))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(12))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(false))
+                .andExpect(jsonPath("$.content[0].id").value(vendaMaisRecente.toString()))
+                .andReturn();
+
+        MvcResult segunda = mockMvc.perform(get("/api/v1/vendas")
+                        .param("page", "1")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(true))
+                .andReturn();
+
+        Set<String> idsPrimeira = ids(primeira);
+        Set<String> idsSegunda = ids(segunda);
+        assertThat(idsPrimeira).doesNotContainAnyElementsOf(idsSegunda);
+    }
+
+    @Test void deveRetornarUltimaPaginaValidaQuandoPaginaNaoExiste() throws Exception {
+        UUID item = item("Barba paginada", TipoItem.SERVICO, "20", null);
+        for (int indice = 0; indice < 12; indice++) {
+            persistirVenda(LocalDate.of(2026, 9, 20).minusDays(indice), null,
+                    StatusVenda.FINALIZADA, "20", item);
+        }
+
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("page", "99")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.totalElements").value(12))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test void deveRetornarPaginaVaziaSemVendas() throws Exception {
+        mockMvc.perform(get("/api/v1/vendas").with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test void deveValidarParametrosDePaginacaoEAceitarLimiteMaximo() throws Exception {
+        mockMvc.perform(get("/api/v1/vendas").param("page", "-1").with(user(USER)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("page deve ser maior ou igual a zero"));
+        for (String size : new String[]{"0", "-1", "101"}) {
+            mockMvc.perform(get("/api/v1/vendas").param("size", size).with(user(USER)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("size deve estar entre 1 e 100"));
+        }
+        mockMvc.perform(get("/api/v1/vendas").param("size", "100").with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+    }
+
+    @Test void deveCombinarFiltrosExistentesComPaginacao() throws Exception {
+        UUID item = item("Filtro de vendas", TipoItem.SERVICO, "40", null);
+        UUID clienteAlvo = cliente("Cliente alvo");
+        UUID outroCliente = cliente("Outro cliente");
+        persistirVenda(LocalDate.of(2026, 8, 10), clienteAlvo,
+                StatusVenda.FINALIZADA, "40", item);
+        persistirVenda(LocalDate.of(2026, 8, 11), clienteAlvo,
+                StatusVenda.FINALIZADA, "40", item);
+        persistirVenda(LocalDate.of(2026, 8, 12), clienteAlvo,
+                StatusVenda.CANCELADA, "40", item);
+        persistirVenda(LocalDate.of(2026, 8, 11), outroCliente,
+                StatusVenda.FINALIZADA, "40", item);
+
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("dataInicial", "2026-08-11")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("dataFinal", "2026-08-10")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("dataInicial", "2026-08-10")
+                        .param("dataFinal", "2026-08-11")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("cliente", clienteAlvo.toString())
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("status", "CANCELADA")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("dataInicial", "2026-08-10")
+                        .param("dataFinal", "2026-08-11")
+                        .param("cliente", clienteAlvo.toString())
+                        .param("status", "FINALIZADA")
+                        .param("page", "1")
+                        .param("size", "1")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test void deveExigirAutenticacaoNaListagemPaginada() throws Exception {
+        mockMvc.perform(get("/api/v1/vendas"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test void deveRejeitarPagamentoDivergenteEQuantidadeInvalida() throws Exception {
@@ -314,6 +465,41 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
                         .contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated()).andReturn();
         return UUID.fromString(mapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
+    }
+    private UUID persistirVenda(LocalDate dataVenda, UUID clienteId, StatusVenda status,
+                                String valor, UUID itemId) {
+        Caixa caixa = caixaRepository.findFirstByStatusOrderByDataCaixaDesc(StatusCaixa.ABERTO)
+                .orElseThrow();
+        Venda venda = new Venda();
+        venda.setCaixa(caixa);
+        venda.setCliente(clienteId == null ? null : clienteRepository.findById(clienteId).orElseThrow());
+        venda.setDataVenda(dataVenda);
+        venda.setValorTotal(new BigDecimal(valor));
+        venda.setStatus(status);
+        venda = vendaRepository.saveAndFlush(venda);
+
+        Item item = itemRepository.findById(itemId).orElseThrow();
+        ItemVenda linha = new ItemVenda();
+        linha.setVenda(venda);
+        linha.setItem(item);
+        linha.setQuantidade(1);
+        linha.setPrecoUnitario(new BigDecimal(valor));
+        linha.setSubtotal(new BigDecimal(valor));
+        itemVendaRepository.saveAndFlush(linha);
+
+        VendaPagamento pagamento = new VendaPagamento();
+        pagamento.setVenda(venda);
+        pagamento.setFormaPagamento(br.com.barbeirofinanceiro.domain.movimentacao.FormaPagamento.PIX);
+        pagamento.setValor(new BigDecimal(valor));
+        pagamentoRepository.saveAndFlush(pagamento);
+        return venda.getId();
+    }
+    private Set<String> ids(MvcResult result) throws Exception {
+        Set<String> ids = new HashSet<>();
+        for (JsonNode node : mapper.readTree(result.getResponse().getContentAsString()).get("content")) {
+            ids.add(node.get("id").asText());
+        }
+        return ids;
     }
     private void criarEsperando(String json, int code) throws Exception { mockMvc.perform(post("/api/v1/vendas").with(csrf()).with(user(USER)).contentType(MediaType.APPLICATION_JSON).content(json)).andExpect(status().is(code)); }
     private UUID item(String nome, TipoItem tipo, String preco, Integer estoque) { Item i=new Item(); i.setNome(nome); i.setTipo(tipo); i.setPreco(new BigDecimal(preco)); i.setEstoque(estoque); return itemRepository.saveAndFlush(i).getId(); }

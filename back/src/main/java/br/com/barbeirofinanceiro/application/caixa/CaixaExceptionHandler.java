@@ -3,6 +3,7 @@ package br.com.barbeirofinanceiro.application.caixa;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -22,6 +23,11 @@ public class CaixaExceptionHandler {
                 .map(error -> error.getDefaultMessage())
                 .orElse("Payload inválido");
         return response(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<Map<String, String>> invalidParameter(MethodArgumentTypeMismatchException exception) {
+        return response(HttpStatus.BAD_REQUEST, "Parâmetro '%s' inválido".formatted(exception.getName()));
     }
 
     @ExceptionHandler(CaixaNotFoundException.class)

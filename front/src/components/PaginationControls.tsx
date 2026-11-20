@@ -4,6 +4,8 @@ interface PaginationControlsProps {
   page: number
   totalPages: number
   totalElements: number
+  first?: boolean
+  last?: boolean
   onPageChange: (page: number) => void
 }
 
@@ -11,6 +13,8 @@ export function PaginationControls({
   page,
   totalPages,
   totalElements,
+  first,
+  last,
   onPageChange,
 }: PaginationControlsProps) {
   if (totalPages === 0) return null
@@ -24,7 +28,7 @@ export function PaginationControls({
         <Button
           type="button"
           variant="outline"
-          disabled={page === 0}
+          disabled={first ?? page === 0}
           onClick={() => onPageChange(page - 1)}
         >
           Anterior
@@ -35,7 +39,7 @@ export function PaginationControls({
         <Button
           type="button"
           variant="outline"
-          disabled={page + 1 >= totalPages}
+          disabled={last ?? page + 1 >= totalPages}
           onClick={() => onPageChange(page + 1)}
         >
           Próxima

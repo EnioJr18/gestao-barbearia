@@ -1,5 +1,6 @@
 package br.com.barbeirofinanceiro.persistence;
 
+import br.com.barbeirofinanceiro.application.auth.JwtService;
 import br.com.barbeirofinanceiro.application.caixa.CaixaResponse;
 import br.com.barbeirofinanceiro.application.caixa.CaixaService;
 import br.com.barbeirofinanceiro.domain.caixa.Caixa;
@@ -21,6 +22,8 @@ import br.com.barbeirofinanceiro.domain.venda.VendaPagamento;
 import br.com.barbeirofinanceiro.domain.venda.VendaPagamentoRepository;
 import br.com.barbeirofinanceiro.domain.venda.VendaRepository;
 import jakarta.persistence.EntityManagerFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
@@ -29,12 +32,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -49,6 +58,9 @@ class CaixaHistoricoIntegrationTest extends PostgresPersistenceTest {
     private static final String USER_EMAIL = "historico-caixa@teste.local";
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private JwtService jwtService;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private ObjectMapper objectMapper;
     @Autowired private CaixaService caixaService;
     @Autowired private CaixaRepository caixaRepository;
     @Autowired private UsuarioRepository usuarioRepository;
@@ -60,14 +72,20 @@ class CaixaHistoricoIntegrationTest extends PostgresPersistenceTest {
 
     private Usuario usuario;
     private Categoria categoriaDespesa;
+    private String token;
 
     @BeforeEach
     void preparar() {
         usuario = newEntity(Usuario.class);
         usuario.setNome("Usuário Histórico");
         usuario.setEmail(USER_EMAIL);
-        usuario.setSenhaHash("hash");
+        usuario.setSenhaHash(passwordEncoder.encode("senha-teste"));
         usuarioRepository.saveAndFlush(usuario);
+
+        token = jwtService.gerarToken(User.withUsername(USER_EMAIL)
+                .password(usuario.getSenhaHash())
+                .roles("USER")
+                .build());
 
         categoriaDespesa = newEntity(Categoria.class);
         categoriaDespesa.setNome("Despesa Histórico");
@@ -89,7 +107,13 @@ class CaixaHistoricoIntegrationTest extends PostgresPersistenceTest {
     void deveRetornarHistoricoVazio() throws Exception {
         mockMvc.perform(get("/api/v1/caixas/historico").with(user(USER_EMAIL)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isEmpty());
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true));
     }
 
     @Test
@@ -98,21 +122,21 @@ class CaixaHistoricoIntegrationTest extends PostgresPersistenceTest {
 
         mockMvc.perform(get("/api/v1/caixas/historico").with(user(USER_EMAIL)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(caixa.getId().toString()))
-                .andExpect(jsonPath("$[0].dataCaixa").value("2026-08-01"))
-                .andExpect(jsonPath("$[0].valorInicial").value(100))
-                .andExpect(jsonPath("$[0].entradasDinheiro").value(0))
-                .andExpect(jsonPath("$[0].saidasDinheiro").value(0))
-                .andExpect(jsonPath("$[0].dinheiro").value(0))
-                .andExpect(jsonPath("$[0].pix").value(0))
-                .andExpect(jsonPath("$[0].debito").value(0))
-                .andExpect(jsonPath("$[0].credito").value(0))
-                .andExpect(jsonPath("$[0].valorEsperado").value(100))
-                .andExpect(jsonPath("$[0].status").value("ABERTO"))
-                .andExpect(jsonPath("$[0].usuarioAberturaId").value(usuario.getId().toString()))
-                .andExpect(jsonPath("$[0].abertoEm").isNotEmpty())
-                .andExpect(jsonPath("$[0].createdAt").isNotEmpty())
-                .andExpect(jsonPath("$[0].updatedAt").isNotEmpty());
+                .andExpect(jsonPath("$.content[0].id").value(caixa.getId().toString()))
+                .andExpect(jsonPath("$.content[0].dataCaixa").value("2026-08-01"))
+                .andExpect(jsonPath("$.content[0].valorInicial").value(100))
+                .andExpect(jsonPath("$.content[0].entradasDinheiro").value(0))
+                .andExpect(jsonPath("$.content[0].saidasDinheiro").value(0))
+                .andExpect(jsonPath("$.content[0].dinheiro").value(0))
+                .andExpect(jsonPath("$.content[0].pix").value(0))
+                .andExpect(jsonPath("$.content[0].debito").value(0))
+                .andExpect(jsonPath("$.content[0].credito").value(0))
+                .andExpect(jsonPath("$.content[0].valorEsperado").value(100))
+                .andExpect(jsonPath("$.content[0].status").value("ABERTO"))
+                .andExpect(jsonPath("$.content[0].usuarioAberturaId").value(usuario.getId().toString()))
+                .andExpect(jsonPath("$.content[0].abertoEm").isNotEmpty())
+                .andExpect(jsonPath("$.content[0].createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.content[0].updatedAt").isNotEmpty());
     }
 
     @Test
@@ -132,13 +156,13 @@ class CaixaHistoricoIntegrationTest extends PostgresPersistenceTest {
 
         mockMvc.perform(get("/api/v1/caixas/historico").with(user(USER_EMAIL)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].entradasDinheiro").value(10))
-                .andExpect(jsonPath("$[0].saidasDinheiro").value(15))
-                .andExpect(jsonPath("$[0].dinheiro").value(10))
-                .andExpect(jsonPath("$[0].pix").value(20))
-                .andExpect(jsonPath("$[0].credito").value(30))
-                .andExpect(jsonPath("$[0].debito").value(40))
-                .andExpect(jsonPath("$[0].valorEsperado").value(95));
+                .andExpect(jsonPath("$.content[0].entradasDinheiro").value(10))
+                .andExpect(jsonPath("$.content[0].saidasDinheiro").value(15))
+                .andExpect(jsonPath("$.content[0].dinheiro").value(10))
+                .andExpect(jsonPath("$.content[0].pix").value(20))
+                .andExpect(jsonPath("$.content[0].credito").value(30))
+                .andExpect(jsonPath("$.content[0].debito").value(40))
+                .andExpect(jsonPath("$.content[0].valorEsperado").value(95));
     }
 
     @Test
@@ -154,40 +178,247 @@ class CaixaHistoricoIntegrationTest extends PostgresPersistenceTest {
 
         mockMvc.perform(get("/api/v1/caixas/historico").with(user(USER_EMAIL)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(recente.getId().toString()))
-                .andExpect(jsonPath("$[0].dinheiro").value(0))
-                .andExpect(jsonPath("$[0].pix").value(22))
-                .andExpect(jsonPath("$[0].saidasDinheiro").value(2))
-                .andExpect(jsonPath("$[0].valorEsperado").value(195))
-                .andExpect(jsonPath("$[1].id").value(antigo.getId().toString()))
-                .andExpect(jsonPath("$[1].dinheiro").value(11))
-                .andExpect(jsonPath("$[1].pix").value(0))
-                .andExpect(jsonPath("$[1].saidasDinheiro").value(1))
-                .andExpect(jsonPath("$[1].valorEsperado").value(110));
+                .andExpect(jsonPath("$.content[0].id").value(recente.getId().toString()))
+                .andExpect(jsonPath("$.content[0].dinheiro").value(0))
+                .andExpect(jsonPath("$.content[0].pix").value(22))
+                .andExpect(jsonPath("$.content[0].saidasDinheiro").value(2))
+                .andExpect(jsonPath("$.content[0].valorEsperado").value(195))
+                .andExpect(jsonPath("$.content[1].id").value(antigo.getId().toString()))
+                .andExpect(jsonPath("$.content[1].dinheiro").value(11))
+                .andExpect(jsonPath("$.content[1].pix").value(0))
+                .andExpect(jsonPath("$.content[1].saidasDinheiro").value(1))
+                .andExpect(jsonPath("$.content[1].valorEsperado").value(110));
     }
 
     @Test
     void quantidadeDeConsultasPermaneceConstanteComMaisCaixas() {
-        caixa(LocalDate.of(2026, 8, 1), StatusCaixa.FECHADO, "100", "100", "0");
+        Caixa caixaInicial = caixa(LocalDate.of(2026, 8, 1), StatusCaixa.FECHADO, "100", "109", "0");
+        registrarFinanceiro(caixaInicial, "10");
         Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.clear();
 
-        List<CaixaResponse> umCaixa = caixaService.listarComResposta();
+        List<CaixaResponse> umCaixa = caixaService.listarComResposta(
+                null, null, null, 0, 100).content();
         long consultasComUmCaixa = statistics.getPrepareStatementCount();
 
-        caixa(LocalDate.of(2026, 8, 2), StatusCaixa.FECHADO, "100", "100", "0");
-        caixa(LocalDate.of(2026, 8, 3), StatusCaixa.FECHADO, "100", "100", "0");
-        caixa(LocalDate.of(2026, 8, 4), StatusCaixa.FECHADO, "100", "100", "0");
-        caixa(LocalDate.of(2026, 8, 5), StatusCaixa.FECHADO, "100", "100", "0");
+        caixa(LocalDate.of(2026, 8, 2), StatusCaixa.FECHADO, "100", "109", "0");
+        caixa(LocalDate.of(2026, 8, 3), StatusCaixa.FECHADO, "100", "109", "0");
+        caixa(LocalDate.of(2026, 8, 4), StatusCaixa.FECHADO, "100", "109", "0");
+        caixa(LocalDate.of(2026, 8, 5), StatusCaixa.FECHADO, "100", "109", "0");
+        List<Caixa> caixas = caixaRepository.findAll();
+        caixas.stream().filter(c -> !c.getId().equals(caixaInicial.getId()))
+                .forEach(c -> registrarFinanceiro(c, "10"));
         statistics.clear();
 
-        List<CaixaResponse> cincoCaixas = caixaService.listarComResposta();
+        List<CaixaResponse> cincoCaixas = caixaService.listarComResposta(
+                null, null, null, 0, 100).content();
         long consultasComCincoCaixas = statistics.getPrepareStatementCount();
 
         assertThat(umCaixa).hasSize(1);
         assertThat(cincoCaixas).hasSize(5);
-        assertThat(consultasComUmCaixa).isEqualTo(3);
         assertThat(consultasComCincoCaixas).isEqualTo(consultasComUmCaixa);
+    }
+
+    @Test
+    void devePaginarHistoricoComOrdenacaoEValoresDoContrato() throws Exception {
+        caixa(LocalDate.of(2026, 8, 1), StatusCaixa.FECHADO, "100", "100", "0");
+        Caixa meio = caixa(LocalDate.of(2026, 8, 2), StatusCaixa.ABERTO, "100", null, null);
+        caixa(LocalDate.of(2026, 8, 3), StatusCaixa.FECHADO, "100", "100", "0");
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("page", "0").param("size", "2")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].dataCaixa").value("2026-08-03"))
+                .andExpect(jsonPath("$.content[1].id").value(meio.getId().toString()))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(false));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("page", "1").param("size", "2")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test
+    void deveAplicarCadaFiltroDeStatusIsoladamente() throws Exception {
+        caixa(LocalDate.of(2026, 8, 1), StatusCaixa.ABERTO, "100", null, null);
+        caixa(LocalDate.of(2026, 8, 2), StatusCaixa.FECHADO, "100", "100", "0");
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("status", "ABERTO")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].status").value("ABERTO"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("status", "FECHADO")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].status").value("FECHADO"));
+    }
+
+    @Test
+    void deveAplicarPeriodoIsoladoComLimitesInclusivos() throws Exception {
+        Caixa anterior = caixa(LocalDate.of(2026, 8, 9), StatusCaixa.FECHADO, "100", "100", "0");
+        Caixa inicio = caixa(LocalDate.of(2026, 8, 10), StatusCaixa.FECHADO, "100", "100", "0");
+        Caixa fim = caixa(LocalDate.of(2026, 8, 12), StatusCaixa.FECHADO, "100", "100", "0");
+        Caixa posterior = caixa(LocalDate.of(2026, 8, 13), StatusCaixa.FECHADO, "100", "100", "0");
+
+        MvcResult resultado = mockMvc.perform(get("/api/v1/caixas/historico")
+                        .param("dataInicial", "2026-08-10")
+                        .param("dataFinal", "2026-08-12")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andReturn();
+
+        List<String> ids = idsDaPagina(resultado);
+        assertThat(ids).containsExactly(fim.getId().toString(), inicio.getId().toString());
+        assertThat(ids).doesNotContain(anterior.getId().toString(), posterior.getId().toString());
+    }
+
+    @Test
+    void deveRetornarPaginasComIdsEstaveisSemRepeticao() throws Exception {
+        Instant mesmoInstante = Instant.parse("2026-08-01T12:00:00Z");
+        List<Caixa> caixas = IntStream.range(0, 25)
+                .mapToObj(i -> {
+                    Caixa caixa = caixa(LocalDate.of(2026, 8, 1), StatusCaixa.FECHADO,
+                            "100", "100", "0");
+                    caixa.setAbertoEm(mesmoInstante);
+                    return caixaRepository.saveAndFlush(caixa);
+                })
+                .toList();
+
+        List<String> idsEsperados = caixas.stream()
+                .map(caixa -> caixa.getId().toString())
+                .sorted(Comparator.reverseOrder())
+                .toList();
+        List<String> idsRetornados = new ArrayList<>();
+
+        for (int pagina = 0; pagina < 3; pagina++) {
+            MvcResult resultado = mockMvc.perform(get("/api/v1/caixas/historico")
+                            .param("page", String.valueOf(pagina))
+                            .param("size", "10")
+                            .with(user(USER_EMAIL)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.page").value(pagina))
+                    .andReturn();
+            List<String> idsPagina = idsDaPagina(resultado);
+            int inicioEsperado = pagina * 10;
+            int fimEsperado = Math.min(inicioEsperado + 10, idsEsperados.size());
+            assertThat(idsPagina).containsExactlyElementsOf(idsEsperados.subList(inicioEsperado, fimEsperado));
+            idsRetornados.addAll(idsPagina);
+        }
+
+        assertThat(idsRetornados).containsExactlyElementsOf(idsEsperados);
+        assertThat(idsRetornados).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void deveRetornarUltimaPaginaValidaEAplicarFiltrosInclusivos() throws Exception {
+        caixa(LocalDate.of(2026, 8, 1), StatusCaixa.FECHADO, "100", "100", "0");
+        Caixa caixaFiltrado = caixa(LocalDate.of(2026, 8, 2), StatusCaixa.ABERTO, "100", null, null);
+        caixa(LocalDate.of(2026, 8, 3), StatusCaixa.FECHADO, "100", "100", "0");
+
+        mockMvc.perform(get("/api/v1/caixas/historico")
+                        .param("status", "ABERTO")
+                        .param("dataInicial", "2026-08-02")
+                        .param("dataFinal", "2026-08-02")
+                        .param("page", "9")
+                        .param("size", "1")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(caixaFiltrado.getId().toString()))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true));
+    }
+
+    @Test
+    void deveValidarDatasEPaginacaoDoHistorico() throws Exception {
+        mockMvc.perform(get("/api/v1/caixas/historico").param("dataInicial", "2026-08-01")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dataInicial e dataFinal devem ser informadas juntas"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("dataFinal", "2026-08-01")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dataInicial e dataFinal devem ser informadas juntas"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("dataInicial", "2026-08-02")
+                        .param("dataFinal", "2026-08-01").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("dataInicial deve ser anterior ou igual a dataFinal"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("dataInicial", "data-invalida")
+                        .param("dataFinal", "2026-08-01").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Parâmetro 'dataInicial' inválido"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("status", "DESCONHECIDO")
+                        .with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Parâmetro 'status' inválido"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("page", "-1").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/caixas/historico").param("size", "-1").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/caixas/historico").param("size", "0").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/caixas/historico").param("size", "101").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("page", "abc").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Parâmetro 'page' inválido"));
+        mockMvc.perform(get("/api/v1/caixas/historico").param("size", "abc").with(user(USER_EMAIL)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Parâmetro 'size' inválido"));
+
+        mockMvc.perform(get("/api/v1/caixas/historico").param("size", "100").with(user(USER_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100));
+    }
+
+    @Test
+    void deveExigirAutenticacaoParaConsultarHistorico() throws Exception {
+        mockMvc.perform(get("/api/v1/caixas/historico"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deveAutorizarConsultaDoHistoricoComJwtValido() throws Exception {
+        mockMvc.perform(get("/api/v1/caixas/historico")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(0));
+    }
+
+    private void registrarFinanceiro(Caixa caixa, String valor) {
+        Venda venda = venda(caixa, StatusVenda.FINALIZADA, valor);
+        pagamento(venda, FormaPagamento.DINHEIRO, valor);
+        movimentacao(caixa, TipoMovimentacao.DESPESA, FormaPagamento.DINHEIRO, "1");
+    }
+
+    private List<String> idsDaPagina(MvcResult resultado) throws Exception {
+        JsonNode content = objectMapper.readTree(resultado.getResponse().getContentAsString())
+                .path("content");
+        List<String> ids = new ArrayList<>();
+        content.forEach(item -> ids.add(item.path("id").asText()));
+        return ids;
     }
 
     private Caixa caixa(
