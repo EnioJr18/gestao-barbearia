@@ -1,5 +1,6 @@
 package br.com.barbeirofinanceiro.application.venda;
 
+import br.com.barbeirofinanceiro.application.common.PageResponse;
 import br.com.barbeirofinanceiro.domain.venda.StatusVenda;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -53,13 +53,15 @@ public class VendaController {
     }
 
     @GetMapping
-    public List<VendaResponse> listar(
+    public PageResponse<VendaResponse> listar(
             @RequestParam(required = false) LocalDate dataInicial,
             @RequestParam(required = false) LocalDate dataFinal,
             @RequestParam(required = false) UUID cliente,
-            @RequestParam(required = false) StatusVenda status
+            @RequestParam(required = false) StatusVenda status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        return service.listarRespostas(dataInicial, dataFinal, cliente, status);
+        return service.listarRespostas(dataInicial, dataFinal, cliente, status, page, size);
     }
 
     @PostMapping("/{id}/cancelar")

@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
   FiPlus,
-  FiSearch,
   FiShoppingBag,
   FiEdit2,
   FiTrash2,
@@ -11,13 +10,14 @@ import {
 } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { PaginationControls } from '@/components/PaginationControls'
 import { useAllClientes } from '@/hooks/cliente/useAllClientes'
 import { useCompleteItens } from '@/hooks/item/useCompleteItens'
 import { useAllVendas } from '@/hooks/venda/useAllVendas'
 import { useCreateVenda } from '@/hooks/venda/useCreateVenda'
 import { useUpdateVenda } from '@/hooks/venda/useUpdateVenda'
 import { useCancelVenda } from '@/hooks/venda/useCancelVenda'
-import type { FormaPagamento } from '@/hooks/venda/types'
+import type { FormaPagamento, StatusVenda } from '@/hooks/venda/types'
 import { getApiErrorMessage } from '@/services/apiError'
 
 const formatCurrency = (value: number) =>
@@ -34,13 +34,32 @@ const paymentLabels: Record<FormaPagamento, string> = {
 export function Pedidos() {
   const [form, setForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [dataInicial, setDataInicial] = useState('')
+  const [dataFinal, setDataFinal] = useState('')
+  const [clienteFiltro, setClienteFiltro] = useState('')
+  const [statusFiltro, setStatusFiltro] = useState<StatusVenda | ''>('')
   const [clientId, setClientId] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
   const [historicalPrices, setHistoricalPrices] = useState<Record<string, number>>({})
   const [payment, setPayment] = useState<FormaPagamento>('PIX')
-  const { data: orders = [], isLoading, error } = useAllVendas()
-  const { data: clients = [] } = useAllClientes({ ativo: true })
+  const {
+    data,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useAllVendas({
+    page,
+    size: 10,
+    dataInicial: dataInicial || undefined,
+    dataFinal: dataFinal || undefined,
+    cliente: clienteFiltro || undefined,
+    status: statusFiltro || undefined,
+  })
+  const orders = data?.content ?? []
+  const currentPage = data?.page ?? page
+  const { data: clients = [] } = useAllClientes()
   const {
     data: items = [],
     isLoading: itemsLoading,
@@ -58,12 +77,10 @@ export function Pedidos() {
     () => new Map(clients.map((client) => [client.id, client])),
     [clients],
   )
-  const visibleOrders = orders.filter((order) => {
-    const client = order.clienteId
-      ? clientById.get(order.clienteId)?.nome
-      : 'Cliente avulso'
-    return `${client} ${order.id}`.toLowerCase().includes(search.toLowerCase())
-  })
+  const selectableClients = useMemo(
+    () => clients.filter((client) => client.ativo || client.id === clientId),
+    [clients, clientId],
+  )
   const cartItems = items.filter((item) => cart[item.id])
   const total = cartItems.reduce(
     (sum, item) =>
@@ -119,6 +136,21 @@ export function Pedidos() {
     setHistoricalPrices(Object.fromEntries(order.itens.map((line) => [line.itemId, Number(line.precoUnitario)])))
     setPayment(order.pagamentos[0]?.formaPagamento ?? 'PIX')
     setForm(true)
+  }
+
+  const clearFilters = () => {
+    setDataInicial('')
+    setDataFinal('')
+    setClienteFiltro('')
+    setStatusFiltro('')
+    setPage(0)
+  }
+
+  const changeStatusFilter = (value: string) => {
+    if (value === '' || value === 'FINALIZADA' || value === 'CANCELADA') {
+      setStatusFiltro(value)
+      setPage(0)
+    }
   }
 
   return (
@@ -214,7 +246,7 @@ export function Pedidos() {
                     className="h-12 rounded-xl border bg-background px-3 text-lg font-normal"
                   >
                     <option value="">Cliente avulso</option>
-                    {clients.map((client) => (
+                    {selectableClients.map((client) => (
                       <option key={client.id} value={client.id}>
                         {client.nome}
                       </option>
@@ -331,19 +363,60 @@ export function Pedidos() {
             )}
           </p>
         )}
-        <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
-          <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
-            <FiSearch />
+        <div className="grid gap-4 border-b bg-muted/20 p-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr_1fr_auto] xl:items-end">
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Data inicial
             <input
-              placeholder="Buscar pedido ou cliente"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="w-full bg-transparent text-lg outline-none"
+              type="date"
+              value={dataInicial}
+              onChange={(event) => { setDataInicial(event.target.value); setPage(0) }}
+              className="h-10 rounded-lg border bg-background px-3 text-base font-normal"
             />
-          </div>
-          <span className="text-sm text-muted-foreground">
-            {visibleOrders.length} pedidos
-          </span>
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Data final
+            <input
+              type="date"
+              value={dataFinal}
+              onChange={(event) => { setDataFinal(event.target.value); setPage(0) }}
+              className="h-10 rounded-lg border bg-background px-3 text-base font-normal"
+            />
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Cliente
+            <select
+              value={clienteFiltro}
+              onChange={(event) => { setClienteFiltro(event.target.value); setPage(0) }}
+              className="h-10 rounded-lg border bg-background px-3 text-base font-normal"
+            >
+              <option value="">Todos os clientes</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.nome}{client.ativo ? '' : ' (inativo)'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1.5 text-sm font-semibold">
+            Status
+            <select
+              value={statusFiltro}
+              onChange={(event) => changeStatusFilter(event.target.value)}
+              className="h-10 rounded-lg border bg-background px-3 text-base font-normal"
+            >
+              <option value="">Todos</option>
+              <option value="FINALIZADA">Finalizados</option>
+              <option value="CANCELADA">Cancelados</option>
+            </select>
+          </label>
+          <Button type="button" variant="outline" className="h-10" onClick={clearFilters}>
+            Limpar filtros
+          </Button>
+          {isFetching && !isLoading ? (
+            <span className="text-sm text-muted-foreground md:col-span-2 xl:col-span-5">
+              Atualizando resultados...
+            </span>
+          ) : null}
         </div>
         <div className="overflow-x-auto">
           <table className="text-lg [&_td]:text-lg [&_th]:text-sm">
@@ -368,17 +441,22 @@ export function Pedidos() {
               ) : error ? (
                 <tr>
                   <td colSpan={7} className="text-center text-red-600">
-                    Não foi possível carregar os pedidos.
+                    <div className="flex flex-col items-center gap-3">
+                      <span>Não foi possível carregar os pedidos.</span>
+                      <Button type="button" variant="outline" onClick={() => void refetch()}>
+                        Tentar novamente
+                      </Button>
+                    </div>
                   </td>
                 </tr>
-              ) : visibleOrders.length === 0 ? (
+              ) : orders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="text-center">
                     Nenhum pedido encontrado.
                   </td>
                 </tr>
               ) : (
-                visibleOrders.map((order) => (
+                orders.map((order) => (
                   <tr key={order.id}>
                     <td>#{order.id.slice(0, 8)}</td>
                     <td>
@@ -437,6 +515,14 @@ export function Pedidos() {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          page={currentPage}
+          totalPages={data?.totalPages ?? 0}
+          totalElements={data?.totalElements ?? 0}
+          first={data?.first}
+          last={data?.last}
+          onPageChange={setPage}
+        />
       </Card>
       <div className="order-note">
         <FiShoppingBag /> Os pedidos são vinculados ao caixa aberto pelo

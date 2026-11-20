@@ -1,5 +1,7 @@
 package br.com.barbeirofinanceiro.application.venda;
 
+import br.com.barbeirofinanceiro.application.common.PageResponse;
+import br.com.barbeirofinanceiro.application.common.PageResponseMapper;
 import br.com.barbeirofinanceiro.domain.caixa.Caixa;
 import br.com.barbeirofinanceiro.domain.caixa.CaixaRepository;
 import br.com.barbeirofinanceiro.domain.cliente.Cliente;
@@ -14,6 +16,9 @@ import br.com.barbeirofinanceiro.domain.venda.Venda;
 import br.com.barbeirofinanceiro.domain.venda.VendaPagamento;
 import br.com.barbeirofinanceiro.domain.venda.VendaPagamentoRepository;
 import br.com.barbeirofinanceiro.domain.venda.VendaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -30,6 +35,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class VendaService {
+
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final VendaRepository vendaRepository;
     private final ItemVendaRepository itemVendaRepository;
@@ -291,12 +298,15 @@ public class VendaService {
     }
 
     @Transactional(readOnly = true)
-    public List<Venda> listar(
+    public Page<Venda> listar(
             LocalDate dataInicial,
             LocalDate dataFinal,
             UUID cliente,
-            StatusVenda status
+            StatusVenda status,
+            int page,
+            int size
     ) {
+        validarPaginacao(page, size);
         Specification<Venda> specification = (root, query, builder) -> builder.conjunction();
 
         if (dataInicial != null) {
@@ -316,25 +326,44 @@ public class VendaService {
                     builder.equal(root.get("status"), status));
         }
 
-        return vendaRepository.findAll(
-                specification,
-                Sort.by(Sort.Direction.DESC, "dataVenda", "createdAt")
+        Sort sort = Sort.by(
+                Sort.Order.desc("dataVenda"),
+                Sort.Order.desc("createdAt"),
+                Sort.Order.desc("id")
         );
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Venda> resultado = vendaRepository.findAll(specification, pageable);
+
+        if (resultado.getTotalElements() == 0) {
+            return Page.empty(PageRequest.of(0, size, sort));
+        }
+
+        if (page >= resultado.getTotalPages()) {
+            int ultimaPagina = resultado.getTotalPages() - 1;
+            return vendaRepository.findAll(
+                    specification,
+                    PageRequest.of(ultimaPagina, size, sort)
+            );
+        }
+
+        return resultado;
     }
 
     @Transactional(readOnly = true)
-    public List<VendaResponse> listarRespostas(
+    public PageResponse<VendaResponse> listarRespostas(
             LocalDate dataInicial,
             LocalDate dataFinal,
             UUID cliente,
-            StatusVenda status
+            StatusVenda status,
+            int page,
+            int size
     ) {
-        List<Venda> vendas = listar(dataInicial, dataFinal, cliente, status);
+        Page<Venda> vendas = listar(dataInicial, dataFinal, cliente, status, page, size);
         if (vendas.isEmpty()) {
-            return List.of();
+            return PageResponseMapper.from(vendas, venda -> VendaResponse.from(venda, List.of(), List.of()));
         }
 
-        List<UUID> vendaIds = vendas.stream().map(Venda::getId).toList();
+        List<UUID> vendaIds = vendas.getContent().stream().map(Venda::getId).toList();
         Map<UUID, List<ItemVenda>> itensPorVenda = itemVendaRepository.findByVendaIdIn(vendaIds)
                 .stream()
                 .collect(Collectors.groupingBy(itemVenda -> itemVenda.getVenda().getId()));
@@ -342,13 +371,14 @@ public class VendaService {
                 .stream()
                 .collect(Collectors.groupingBy(pagamento -> pagamento.getVenda().getId()));
 
-        return vendas.stream()
-                .map(venda -> VendaResponse.from(
+        return PageResponseMapper.from(
+                vendas,
+                venda -> VendaResponse.from(
                         venda,
                         itensPorVenda.getOrDefault(venda.getId(), List.of()),
                         pagamentosPorVenda.getOrDefault(venda.getId(), List.of())
-                ))
-                .toList();
+                )
+        );
     }
 
     private VendaResponse resposta(Venda venda) {
@@ -372,6 +402,15 @@ public class VendaService {
             throw new VendaValidationException(
                     "A soma dos pagamentos deve ser igual ao total da venda"
             );
+        }
+    }
+
+    private void validarPaginacao(int page, int size) {
+        if (page < 0) {
+            throw new VendaValidationException("page deve ser maior ou igual a zero");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new VendaValidationException("size deve estar entre 1 e " + MAX_PAGE_SIZE);
         }
     }
 }

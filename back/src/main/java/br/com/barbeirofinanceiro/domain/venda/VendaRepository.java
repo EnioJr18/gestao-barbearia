@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -19,6 +21,10 @@ public interface VendaRepository extends JpaRepository<Venda, UUID>, JpaSpecific
     @Override
     @EntityGraph(attributePaths = {"cliente", "caixa"})
     List<Venda> findAll(Specification<Venda> specification, Sort sort);
+
+    @Override
+    @EntityGraph(attributePaths = {"cliente", "caixa"})
+    Page<Venda> findAll(Specification<Venda> specification, Pageable pageable);
 
     @Query("""
         SELECT new br.com.barbeirofinanceiro.domain.venda.VendaResumoProjection(

@@ -30,6 +30,8 @@ export interface CriarVendaRequest {
 }
 
 export interface ListVendasParams {
+  page?: number
+  size?: number
   dataInicial?: string
   dataFinal?: string
   cliente?: string

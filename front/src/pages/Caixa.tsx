@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PaginationControls } from '@/components/PaginationControls'
 import { useAllCaixas } from '@/hooks/caixa/useAllCaixas'
 import { useCloseCaixa } from '@/hooks/caixa/useCloseCaixa'
 import { useCurrentCaixa } from '@/hooks/caixa/useCurrentCaixa'
@@ -53,10 +54,31 @@ type CloseForm = { valorApurado: string }
 export function Caixa() {
   const [openModal, setOpenModal] = useState(false)
   const [closeModal, setCloseModal] = useState(false)
+  const [page, setPage] = useState(0)
+  const [statusFilter, setStatusFilter] = useState<'' | 'ABERTO' | 'FECHADO'>('')
+  const [dataInicialFilter, setDataInicialFilter] = useState('')
+  const [dataFinalFilter, setDataFinalFilter] = useState('')
+  const periodoIncompleto = Boolean(dataInicialFilter) !== Boolean(dataFinalFilter)
+  const historicoQuery = useAllCaixas(
+    {
+      page,
+      size: 10,
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(dataInicialFilter && dataFinalFilter
+        ? { dataInicial: dataInicialFilter, dataFinal: dataFinalFilter }
+        : {}),
+    },
+    { enabled: !periodoIncompleto },
+  )
   const { data: caixa, isLoading: currentLoading, error: currentError } =
     useCurrentCaixa()
-  const { data: historico = [], isLoading: historyLoading, error: historyError } =
-    useAllCaixas()
+  const {
+    data: historicoPage,
+    isLoading: historyLoading,
+    error: historyError,
+    refetch: refetchHistory,
+  } = historicoQuery
+  const historico = historicoPage?.content ?? []
   const openMutation = useOpenCaixa()
   const closeMutation = useCloseCaixa()
   const openForm = useForm<OpenForm>({ defaultValues: { valorInicial: '100,00' } })
@@ -145,12 +167,78 @@ export function Caixa() {
         ))}
       </div>
       <Card className="mt-6 overflow-hidden rounded-2xl">
-        <div className="border-b p-6"><h2 className="font-heading text-2xl font-bold">Histórico de sessões</h2></div>
+        <div className="border-b p-6">
+          <h2 className="font-heading text-2xl font-bold">Histórico de sessões</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="history-status">Status</Label>
+              <select
+                id="history-status"
+                className="h-10 rounded-md border border-input bg-background px-3"
+                value={statusFilter}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setStatusFilter(value === 'ABERTO' || value === 'FECHADO' ? value : '')
+                  setPage(0)
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="ABERTO">Aberto</option>
+                <option value="FECHADO">Fechado</option>
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="history-start-date">Data inicial</Label>
+              <Input
+                id="history-start-date"
+                type="date"
+                value={dataInicialFilter}
+                onChange={(event) => {
+                  setDataInicialFilter(event.target.value)
+                  setPage(0)
+                }}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="history-end-date">Data final</Label>
+              <Input
+                id="history-end-date"
+                type="date"
+                value={dataFinalFilter}
+                onChange={(event) => {
+                  setDataFinalFilter(event.target.value)
+                  setPage(0)
+                }}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setStatusFilter('')
+                  setDataInicialFilter('')
+                  setDataFinalFilter('')
+                  setPage(0)
+                }}
+                disabled={!statusFilter && !dataInicialFilter && !dataFinalFilter}
+              >
+                Limpar filtros
+              </Button>
+            </div>
+          </div>
+          {periodoIncompleto && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Selecione as duas datas para filtrar o período.
+            </p>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-225 border-collapse text-lg [&_td]:text-lg [&_th]:text-sm">
             <thead><tr><th>ABERTURA</th><th>FECHAMENTO</th><th>VENDAS</th><th>ESPERADO</th><th>CONTADO</th><th>DIFERENÇA</th></tr></thead>
             <tbody>
-              {historyLoading ? <tr><td colSpan={6} className="text-center text-lg">Carregando histórico...</td></tr> : historyError ? <tr><td colSpan={6} className="text-center text-lg text-red-500">Não foi possível carregar o histórico.</td></tr> : historico.length === 0 ? <tr><td colSpan={6} className="text-center text-lg">Nenhuma sessão registrada.</td></tr> : historico.map((session) => {
+              {periodoIncompleto ? <tr><td colSpan={6} className="text-center text-lg">Informe a data inicial e a data final.</td></tr> : historyLoading ? <tr><td colSpan={6} className="text-center text-lg">Carregando histórico...</td></tr> : historyError ? <tr><td colSpan={6} className="text-center text-lg text-red-500">Não foi possível carregar o histórico.</td></tr> : historico.length === 0 ? <tr><td colSpan={6} className="text-center text-lg">Nenhuma sessão registrada.</td></tr> : historico.map((session) => {
                 const vendas = session.dinheiro + session.pix + session.debito + session.credito
                 return (
                   <tr key={session.id}>
@@ -177,6 +265,24 @@ export function Caixa() {
             </tbody>
           </table>
         </div>
+        {historyError ? (
+          <div className="border-t p-4 text-center">
+            <Button type="button" variant="outline" onClick={() => void refetchHistory()}>
+              Tentar novamente
+            </Button>
+          </div>
+        ) : historicoPage && historicoPage.totalPages > 0 ? (
+          <PaginationControls
+            page={historicoPage.page}
+            totalPages={historicoPage.totalPages}
+            totalElements={historicoPage.totalElements}
+            first={historicoPage.first}
+            last={historicoPage.last}
+            onPageChange={setPage}
+          />
+        ) : !periodoIncompleto && !historyLoading ? (
+          <div className="border-t px-6 py-4 text-sm text-muted-foreground">0 registros</div>
+        ) : null}
       </Card>
       {openModal && <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-5" onMouseDown={() => { if (!openMutation.isPending) { openMutation.reset(); setOpenModal(false) } }}>
         <div className="w-full max-w-md rounded-2xl bg-background p-8 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>

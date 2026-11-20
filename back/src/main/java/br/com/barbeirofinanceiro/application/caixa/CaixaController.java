@@ -1,13 +1,15 @@
 package br.com.barbeirofinanceiro.application.caixa;
 
+import br.com.barbeirofinanceiro.application.common.PageResponse;
+import br.com.barbeirofinanceiro.domain.caixa.StatusCaixa;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.UUID;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/caixas")
@@ -39,8 +41,14 @@ public class CaixaController {
     }
 
     @GetMapping("/historico")
-    public List<CaixaResponse> listar() {
-        return caixaService.listarComResposta();
+    public PageResponse<CaixaResponse> listar(
+            @RequestParam(required = false) StatusCaixa status,
+            @RequestParam(required = false) LocalDate dataInicial,
+            @RequestParam(required = false) LocalDate dataFinal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return caixaService.listarComResposta(status, dataInicial, dataFinal, page, size);
     }
 
     @PostMapping("/{id}/fechar")

@@ -68,6 +68,8 @@ export function Relatorios() {
   const monthDashboard = useDashboard(selectedRange.start, selectedRange.end)
   const yearDashboard = useDashboard(yearRange.start, yearRange.end)
   const sales = useAllVendas({
+    page: 0,
+    size: 10,
     dataInicial: selectedRange.start,
     dataFinal: selectedRange.end,
     status: 'FINALIZADA',
@@ -245,7 +247,7 @@ export function Relatorios() {
             <CardTitle className="text-xl">Últimas 10 vendas</CardTitle>
           </CardHeader>
           <CardContent>
-            {(sales.data ?? []).slice(0, 10).map((sale) => (
+            {(sales.data?.content ?? []).map((sale) => (
               <div className="flex items-center gap-3 border-b py-3 last:border-0" key={sale.id}>
                 <span className="w-16 shrink-0 text-sm text-muted-foreground">
                   #{sale.id.slice(0, 6)}
@@ -264,7 +266,7 @@ export function Relatorios() {
                 <strong className="text-base">{formatCurrency(Number(sale.valorTotal))}</strong>
               </div>
             ))}
-            {!sales.data?.length ? <EmptyState text="Sem vendas neste mês." /> : null}
+            {!sales.data?.content.length ? <EmptyState text="Sem vendas neste mês." /> : null}
           </CardContent>
         </Card>
       </div>
