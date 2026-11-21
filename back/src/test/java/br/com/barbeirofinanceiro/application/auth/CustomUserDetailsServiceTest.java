@@ -2,6 +2,7 @@ package br.com.barbeirofinanceiro.application.auth;
 
 import br.com.barbeirofinanceiro.domain.usuario.Usuario;
 import br.com.barbeirofinanceiro.domain.usuario.UsuarioRepository;
+import br.com.barbeirofinanceiro.domain.usuario.UsuarioPerfil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +41,9 @@ class CustomUserDetailsServiceTest {
         when(usuario.isAtivo())
                 .thenReturn(true);
 
+        when(usuario.getPerfil())
+                .thenReturn(UsuarioPerfil.OPERADOR);
+
         when(usuarioRepository.findByEmailIgnoreCase("usuario@teste.local"))
                 .thenReturn(Optional.of(usuario));
 
@@ -59,7 +63,7 @@ class CustomUserDetailsServiceTest {
         assertTrue(
                 userDetails.getAuthorities().stream()
                         .anyMatch(authority ->
-                                authority.getAuthority().equals("ROLE_USER"))
+                                authority.getAuthority().equals("ROLE_OPERADOR"))
         );
 
         assertTrue(userDetails.isEnabled());

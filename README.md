@@ -110,6 +110,56 @@ Set-Location back
 
 `POST /api/v1/auth/login` é público. As demais rotas exigem JWT Bearer. Tokens são invalidados quando a senha muda e deixam de funcionar quando o usuário é desativado.
 
+O sistema possui dois perfis: `ADMIN` e `OPERADOR`. Ambos acessam os dados
+operacionais compartilhados da barbearia. O `ADMIN` pode consultar e administrar
+contas, criar usuários e definir perfis. O `OPERADOR` pode acessar a operação e
+autogerenciar seus próprios dados, mas não pode administrar outras contas.
+O cadastro público foi removido: usuários novos são criados por um administrador
+em `POST /api/v1/usuarios` e recebem perfil `OPERADOR` por padrão.
+As rotas administrativas são `GET /api/v1/usuarios`, `GET` e `PUT`
+`/api/v1/usuarios/{id}`, além de `PATCH /api/v1/usuarios/{id}/ativar` ou
+`PATCH /api/v1/usuarios/{id}/desativar`. O campo `perfil` só é aceito nos DTOs
+administrativos. A conta própria continua em `GET/PUT /api/v1/usuarios/me`,
+`PUT /api/v1/usuarios/me/senha` e `PATCH /api/v1/usuarios/me/desativar`.
+
+### Provisionar o primeiro administrador
+
+O provisionamento é um comando separado, executado sem servidor HTTP. Não é
+executado durante a inicialização normal. Primeiro configure a conexão local do
+PostgreSQL e `JWT_SECRET`, como no `.env`, e depois defina temporariamente no
+ambiente do PowerShell:
+
+```powershell
+$env:ADMIN_PROVISIONING_CONFIRM = 'true'
+$env:ADMIN_PROVISIONING_ACTION = 'create'
+$env:ADMIN_PROVISIONING_NAME = 'Nome do administrador'
+$env:ADMIN_PROVISIONING_EMAIL = 'admin@exemplo.invalid'
+$secure = Read-Host 'Senha temporária (mínimo 12 caracteres)' -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try {
+  $env:ADMIN_PROVISIONING_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+  Set-Location back
+  .\gradlew.bat provisionAdmin --no-daemon
+} finally {
+  Remove-Item Env:ADMIN_PROVISIONING_CONFIRM, Env:ADMIN_PROVISIONING_ACTION,
+    Env:ADMIN_PROVISIONING_NAME, Env:ADMIN_PROVISIONING_EMAIL,
+    Env:ADMIN_PROVISIONING_PASSWORD -ErrorAction SilentlyContinue
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+  $secure.Dispose()
+}
+```
+
+Para uma instalação existente sem administrador ativo, é possível promover uma
+conta explicitamente escolhida: defina `ADMIN_PROVISIONING_CONFIRM=true`,
+`ADMIN_PROVISIONING_ACTION=promote` e `ADMIN_PROVISIONING_USER_ID=<UUID>` e execute
+o mesmo comando. Obtenha o UUID com uma consulta somente de leitura à tabela
+`usuarios` e confira cuidadosamente a conta selecionada antes da execução;
+contas inexistentes ou inativas são recusadas. Em ambos os modos, a operação
+falha se já houver um `ADMIN` ativo. O perfil de provisionamento e a ausência de
+servidor HTTP são fixados pela tarefa `provisionAdmin`. Após sucesso, as variáveis
+temporárias devem ser removidas; confirme o perfil pela listagem administrativa
+após iniciar a API normalmente.
+
 ## Backup e restauração
 
 Backups são arquivos locais controlados pelo backend, registrados no banco e armazenados em `backups/`. A restauração aceita somente backups registrados com sucesso pelo sistema. Depois de uma restauração bem-sucedida, a API permanece em manutenção e requer reinício do ambiente antes de voltar a atender requisições.

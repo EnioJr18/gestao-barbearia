@@ -45,6 +45,13 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
+tasks.register<JavaExec>("provisionAdmin") {
+    group = "application"
+    description = "Runs the explicit one-time administrator provisioning command without an HTTP server."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("br.com.barbeirofinanceiro.ProvisionarAdminApplication")
+}
+
 springBoot {
     mainClass.set("br.com.barbeirofinanceiro.BarbeiroFinanceiroApplication")
 }

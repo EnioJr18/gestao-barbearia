@@ -8,6 +8,7 @@ import br.com.barbeirofinanceiro.domain.backup.BackupExecucaoRepository;
 import br.com.barbeirofinanceiro.domain.backup.BackupStatus;
 import br.com.barbeirofinanceiro.domain.backup.BackupTipo;
 import br.com.barbeirofinanceiro.domain.usuario.Usuario;
+import br.com.barbeirofinanceiro.domain.usuario.UsuarioPerfil;
 import br.com.barbeirofinanceiro.domain.usuario.UsuarioRepository;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -42,6 +43,7 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
 
     private static final Path BACKUP_DIRECTORY = criarDiretorioTemporario();
     private static final String EMAIL = "backup@teste.local";
+    private static final String OPERATOR_EMAIL = "backup-operador@teste.local";
 
     @Autowired
     private MockMvc mockMvc;
@@ -65,6 +67,7 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
     private PostgresBackupExecutor postgresBackupExecutor;
 
     private String token;
+    private String operatorToken;
 
     @DynamicPropertySource
     static void configurarBackup(DynamicPropertyRegistry registry) {
@@ -77,9 +80,21 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
         usuario.setNome("Usuário Backup");
         usuario.setEmail(EMAIL);
         usuario.setSenhaHash(passwordEncoder.encode("123456"));
+        usuario.setPerfil(UsuarioPerfil.ADMIN);
         usuarioRepository.saveAndFlush(usuario);
         token = jwtService.gerarToken(User.withUsername(EMAIL)
                 .password(usuario.getSenhaHash())
+                .roles("USER")
+                .build());
+
+        Usuario operador = newEntity(Usuario.class);
+        operador.setNome("Operador Backup");
+        operador.setEmail(OPERATOR_EMAIL);
+        operador.setSenhaHash(passwordEncoder.encode("123456"));
+        operador.setPerfil(UsuarioPerfil.OPERADOR);
+        usuarioRepository.saveAndFlush(operador);
+        operatorToken = jwtService.gerarToken(User.withUsername(OPERATOR_EMAIL)
+                .password(operador.getSenhaHash())
                 .roles("USER")
                 .build());
     }
@@ -111,6 +126,30 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
     @Test
     void deveRejeitarJwtInvalidoParaBackups() throws Exception {
         mockMvc.perform(get("/api/v1/backups").header("Authorization", "Bearer invalido"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void operadorNaoPodeListarCriarOuRestaurarBackups() throws Exception {
+        mockMvc.perform(get("/api/v1/backups").header("Authorization", bearer(operatorToken)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/backups").header("Authorization", bearer(operatorToken)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/backups/{arquivo}/restaurar", "backup-teste.backup")
+                        .header("Authorization", bearer(operatorToken)))
+                .andExpect(status().isForbidden());
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, backupExecucaoRepository.count());
+        org.mockito.Mockito.verifyNoInteractions(postgresBackupExecutor);
+    }
+
+    @Test
+    void anonimoNaoPodeListarOuRestaurarBackups() throws Exception {
+        mockMvc.perform(get("/api/v1/backups"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/backups/{arquivo}/restaurar", "backup-teste.backup"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -243,7 +282,11 @@ class BackupControllerIntegrationTest extends PostgresPersistenceTest {
     }
 
     private String bearer() {
-        return "Bearer " + token;
+        return bearer(token);
+    }
+
+    private String bearer(String accessToken) {
+        return "Bearer " + accessToken;
     }
 
     private void excluir(Path path) {

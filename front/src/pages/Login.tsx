@@ -11,52 +11,32 @@ import {
   FiLock,
   FiMail,
   FiScissors,
-  FiUser,
 } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
-import { useCreateUser } from '@/hooks/user/useCreateUser'
 import { useLogin } from '@/hooks/user/useLogin'
 
 const loginSchema = z.object({
-  nome: z.string().optional(),
   email: z.string().email('Digite um e-mail válido'),
   senha: z.string().min(6, 'A senha deve ter pelo menos 6 caracteres'),
 })
 type FormValues = z.infer<typeof loginSchema>
 
 export function Login() {
-  const [registering, setRegistering] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const loginMutation = useLogin()
-  const createUserMutation = useCreateUser()
   const navigate = useNavigate()
   const form = useForm<FormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { nome: '', email: '', senha: '' },
+    defaultValues: { email: '', senha: '' },
   })
-  const mutation = registering ? createUserMutation : loginMutation
   const errorMessage =
-    mutation.error instanceof AxiosError
-      ? (mutation.error.response?.data?.message ??
+    loginMutation.error instanceof AxiosError
+      ? (loginMutation.error.response?.data?.message ??
         'Não foi possível concluir a operação.')
-      : mutation.error?.message
+      : loginMutation.error?.message
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      if (registering) {
-        if (!values.nome || values.nome.trim().length < 2) {
-          form.setError('nome', { message: 'Digite seu nome' })
-          return
-        }
-        await createUserMutation.mutateAsync({
-          nome: values.nome,
-          email: values.email,
-          senha: values.senha,
-        })
-        setRegistering(false)
-        form.reset({ nome: '', email: values.email, senha: '' })
-        return
-      }
       await loginMutation.mutateAsync({
         email: values.email,
         senha: values.senha,
@@ -66,13 +46,6 @@ export function Login() {
       return
     }
   })
-
-  const switchMode = () => {
-    setRegistering((current) => !current)
-    form.clearErrors()
-    loginMutation.reset()
-    createUserMutation.reset()
-  }
 
   return (
     <main className="relative flex min-h-screen overflow-hidden bg-[#f4f7f4] text-[#172624]">
@@ -120,31 +93,16 @@ export function Login() {
           </div>
           <div className="mb-9">
             <p className="mb-3 text-xs font-bold uppercase tracking-[0.2em] text-[#2c8279]">
-              {registering ? 'Comece agora' : 'Bem-vindo de volta'}
+              Bem-vindo de volta
             </p>
             <h2 className="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-              {registering ? 'Crie sua conta' : 'Acesse seu workspace'}
+              Acesse seu workspace
             </h2>
             <p className="mt-3 text-sm leading-6 text-[#657773]">
-              {registering
-                ? 'Tenha uma visão mais clara da sua operação.'
-                : 'Entre para acompanhar sua barbearia de onde estiver.'}
+              Entre para acompanhar sua barbearia de onde estiver.
             </p>
           </div>
           <form onSubmit={onSubmit} className="space-y-5">
-            {registering && (
-              <Field
-                label="Seu nome"
-                icon={<FiUser />}
-                error={form.formState.errors.nome?.message}
-              >
-                <input
-                  {...form.register('nome')}
-                  placeholder="Marcos Silva"
-                  className="h-12 w-full rounded-lg border border-[#d9e2de] bg-white pl-10 pr-4 text-sm font-normal text-[#172624] outline-none transition placeholder:text-[#9aaba6] focus:border-[#2c8279] focus:ring-2 focus:ring-[#2c8279]/15"
-                />
-              </Field>
-            )}
             <Field
               label="E-mail"
               icon={<FiMail />}
@@ -186,31 +144,15 @@ export function Login() {
             )}
             <button
               type="submit"
-              disabled={mutation.isPending}
+              disabled={loginMutation.isPending}
               className="group flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#123d39] text-sm font-bold text-white transition hover:bg-[#1c5a53] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {mutation.isPending
-                ? 'Aguarde...'
-                : registering
-                  ? 'Criar minha conta'
-                  : 'Entrar no painel'}
-              {!mutation.isPending && (
+              {loginMutation.isPending ? 'Aguarde...' : 'Entrar no painel'}
+              {!loginMutation.isPending && (
                 <FiArrowRight className="transition-transform group-hover:translate-x-1" />
               )}
             </button>
           </form>
-          <p className="mt-8 text-center text-sm text-[#657773]">
-            {registering
-              ? 'Já possui uma conta?'
-              : 'Ainda não possui uma conta?'}{' '}
-            <button
-              type="button"
-              onClick={switchMode}
-              className="font-bold text-[#2c8279] hover:underline"
-            >
-              {registering ? 'Entrar' : 'Criar conta'}
-            </button>
-          </p>
         </div>
       </section>
     </main>

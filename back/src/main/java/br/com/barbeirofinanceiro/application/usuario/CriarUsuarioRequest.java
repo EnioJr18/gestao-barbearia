@@ -3,6 +3,7 @@ package br.com.barbeirofinanceiro.application.usuario;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import br.com.barbeirofinanceiro.domain.usuario.UsuarioPerfil;
 
 public record CriarUsuarioRequest(
         @NotBlank(message = "nome é obrigatório")
@@ -16,6 +17,8 @@ public record CriarUsuarioRequest(
 
         @NotBlank(message = "senha é obrigatória")
         @Size(min = 6, max = 255, message = "senha deve possuir entre 6 e 255 caracteres")
-        String senha
+        String senha,
+
+        UsuarioPerfil perfil
 ) {
 }

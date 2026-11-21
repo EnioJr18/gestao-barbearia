@@ -1,27 +1,32 @@
 package br.com.barbeirofinanceiro.application.usuario;
 
 import br.com.barbeirofinanceiro.domain.usuario.Usuario;
+import br.com.barbeirofinanceiro.domain.usuario.UsuarioPerfil;
 import br.com.barbeirofinanceiro.domain.usuario.UsuarioRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UsuarioAdminLock adminLock;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            UsuarioAdminLock adminLock
     ) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.adminLock = adminLock;
     }
 
     @Transactional
@@ -35,7 +40,61 @@ public class UsuarioService {
         usuario.setNome(request.nome().trim());
         usuario.setEmail(email);
         usuario.setSenhaHash(passwordEncoder.encode(request.senha()));
+        usuario.setPerfil(request.perfil() == null ? UsuarioPerfil.OPERADOR : request.perfil());
+        if (usuario.getPerfil() == UsuarioPerfil.ADMIN) {
+            adminLock.bloquearAlteracoesAdministrativas();
+        }
         return UsuarioResponse.from(salvar(usuario));
+    }
+
+    @Transactional(readOnly = true)
+    public List<UsuarioResponse> listarAdministrativamente() {
+        return usuarioRepository.findAllByOrderByNomeAsc().stream()
+                .map(UsuarioResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public UsuarioResponse consultarAdministrativamente(UUID id) {
+        return UsuarioResponse.from(buscarPorId(id));
+    }
+
+    @Transactional
+    public UsuarioResponse atualizarAdministrativamente(
+            UUID id,
+            AtualizarUsuarioAdministrativoRequest request
+    ) {
+        adminLock.bloquearAlteracoesAdministrativas();
+        Usuario usuario = buscarPorId(id);
+        validarEmailDisponivel(request.email(), id);
+
+        if (usuario.isAtivo() && usuario.getPerfil() == UsuarioPerfil.ADMIN
+                && request.perfil() != UsuarioPerfil.ADMIN) {
+            exigirOutroAdminAtivo();
+        }
+
+        usuario.setNome(request.nome().trim());
+        usuario.setEmail(normalizarEmail(request.email()));
+        usuario.setPerfil(request.perfil());
+        return UsuarioResponse.from(salvar(usuario));
+    }
+
+    @Transactional
+    public UsuarioResponse ativarAdministrativamente(UUID id) {
+        Usuario usuario = buscarPorId(id);
+        usuario.setAtivo(true);
+        return UsuarioResponse.from(salvar(usuario));
+    }
+
+    @Transactional
+    public void desativarAdministrativamente(UUID id) {
+        adminLock.bloquearAlteracoesAdministrativas();
+        Usuario usuario = buscarPorId(id);
+        if (usuario.isAtivo() && usuario.getPerfil() == UsuarioPerfil.ADMIN) {
+            exigirOutroAdminAtivo();
+        }
+        usuario.setAtivo(false);
+        salvar(usuario);
     }
 
     @Transactional(readOnly = true)
@@ -51,11 +110,7 @@ public class UsuarioService {
         Usuario usuario = usuarioAutenticado(authentication);
         String email = normalizarEmail(request.email());
 
-        usuarioRepository.findByEmailIgnoreCase(email).ifPresent(usuarioExistente -> {
-            if (!usuarioExistente.getId().equals(usuario.getId())) {
-                throw new UsuarioConflictException("Já existe um usuário com este e-mail");
-            }
-        });
+        validarEmailDisponivel(email, usuario.getId());
 
         usuario.setNome(request.nome().trim());
         usuario.setEmail(email);
@@ -77,8 +132,28 @@ public class UsuarioService {
     @Transactional
     public void desativarAtual(Authentication authentication) {
         Usuario usuario = usuarioAutenticado(authentication);
-        usuario.setAtivo(false);
-        salvar(usuario);
+        desativarAdministrativamente(usuario.getId());
+    }
+
+    private Usuario buscarPorId(UUID id) {
+        return usuarioRepository.findById(id)
+                .orElseThrow(() -> new UsuarioNotFoundException("Usuário não encontrado"));
+    }
+
+    private void validarEmailDisponivel(String email, UUID idIgnorado) {
+        usuarioRepository.findByEmailIgnoreCase(normalizarEmail(email)).ifPresent(usuarioExistente -> {
+            if (!usuarioExistente.getId().equals(idIgnorado)) {
+                throw new UsuarioConflictException("Já existe um usuário com este e-mail");
+            }
+        });
+    }
+
+    private void exigirOutroAdminAtivo() {
+        int administradoresAtivos = usuarioRepository
+                .findAtivosPorPerfilParaAtualizacao(UsuarioPerfil.ADMIN).size();
+        if (administradoresAtivos <= 1) {
+            throw new UsuarioConflictException("Não é possível remover o último administrador ativo");
+        }
     }
 
     private Usuario usuarioAutenticado(Authentication authentication) {

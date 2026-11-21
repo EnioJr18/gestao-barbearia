@@ -1,6 +1,7 @@
 package br.com.barbeirofinanceiro.application.usuario;
 
 import br.com.barbeirofinanceiro.domain.usuario.Usuario;
+import br.com.barbeirofinanceiro.domain.usuario.UsuarioPerfil;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -9,6 +10,7 @@ public record UsuarioResponse(
         UUID id,
         String nome,
         String email,
+        UsuarioPerfil perfil,
         boolean ativo,
         Instant createdAt,
         Instant updatedAt
@@ -19,6 +21,7 @@ public record UsuarioResponse(
                 usuario.getId(),
                 usuario.getNome(),
                 usuario.getEmail(),
+                usuario.getPerfil(),
                 usuario.isAtivo(),
                 usuario.getCreatedAt(),
                 usuario.getUpdatedAt()

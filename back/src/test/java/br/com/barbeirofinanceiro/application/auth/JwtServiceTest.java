@@ -121,4 +121,21 @@ class JwtServiceTest {
         assertThrows(RuntimeException.class, () -> service.extrairUsername(tokenInvalido));
         assertFalse(service.validarToken(tokenInvalido, user));
     }
+
+    @Test
+    void deveRejeitarTokenExpirado() {
+        UserDetails user = User.withUsername("usuario@teste.local")
+                .password("hash")
+                .roles("USER")
+                .build();
+        String tokenExpirado = Jwts.builder()
+                .subject(user.getUsername())
+                .claim("cv", "valor-antigo")
+                .issuedAt(new Date(System.currentTimeMillis() - 10_000))
+                .expiration(new Date(System.currentTimeMillis() - 1_000))
+                .signWith(Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8)))
+                .compact();
+
+        assertFalse(service.validarToken(tokenExpirado, user));
+    }
 }
