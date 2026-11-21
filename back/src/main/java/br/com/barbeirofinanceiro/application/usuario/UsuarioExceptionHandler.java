@@ -2,13 +2,19 @@ package br.com.barbeirofinanceiro.application.usuario;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-@RestControllerAdvice
+@RestControllerAdvice(assignableTypes = UsuarioController.class)
 public class UsuarioExceptionHandler {
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<Map<String, String>> unreadablePayload(HttpMessageNotReadableException exception) {
+        return response(HttpStatus.BAD_REQUEST, "Payload inválido ou contém campos não permitidos");
+    }
 
     @ExceptionHandler(UsuarioValidationException.class)
     ResponseEntity<Map<String, String>> validation(UsuarioValidationException exception) {

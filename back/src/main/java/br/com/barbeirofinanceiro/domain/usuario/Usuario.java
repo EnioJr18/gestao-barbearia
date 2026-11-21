@@ -19,6 +19,10 @@ public class Usuario {
     @Column(name = "senha_hash", nullable = false, length = 255)
     private String senhaHash;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UsuarioPerfil perfil = UsuarioPerfil.OPERADOR;
+
     @Column(nullable = false)
     private boolean ativo = true;
 
@@ -53,6 +57,8 @@ public class Usuario {
     public void setEmail(String email) { this.email = email; }
     public String getSenhaHash() { return senhaHash; }
     public void setSenhaHash(String senhaHash) { this.senhaHash = senhaHash; }
+    public UsuarioPerfil getPerfil() { return perfil; }
+    public void setPerfil(UsuarioPerfil perfil) { this.perfil = perfil; }
     public boolean isAtivo() { return ativo; }
     public void setAtivo(boolean ativo) { this.ativo = ativo; }
     public Instant getCreatedAt() { return createdAt; }

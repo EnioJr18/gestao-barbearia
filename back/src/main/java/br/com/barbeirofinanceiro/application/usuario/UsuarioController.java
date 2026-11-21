@@ -11,6 +11,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
+
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/usuarios")
@@ -28,6 +32,35 @@ public class UsuarioController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(usuarioService.criar(request));
+    }
+
+    @GetMapping
+    public List<UsuarioResponse> listarAdministrativamente() {
+        return usuarioService.listarAdministrativamente();
+    }
+
+    @GetMapping("/{id}")
+    public UsuarioResponse consultarAdministrativamente(@PathVariable UUID id) {
+        return usuarioService.consultarAdministrativamente(id);
+    }
+
+    @PutMapping("/{id}")
+    public UsuarioResponse atualizarAdministrativamente(
+            @PathVariable UUID id,
+            @Valid @RequestBody AtualizarUsuarioAdministrativoRequest request
+    ) {
+        return usuarioService.atualizarAdministrativamente(id, request);
+    }
+
+    @PatchMapping("/{id}/ativar")
+    public UsuarioResponse ativarAdministrativamente(@PathVariable UUID id) {
+        return usuarioService.ativarAdministrativamente(id);
+    }
+
+    @PatchMapping("/{id}/desativar")
+    public ResponseEntity<Void> desativarAdministrativamente(@PathVariable UUID id) {
+        usuarioService.desativarAdministrativamente(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")

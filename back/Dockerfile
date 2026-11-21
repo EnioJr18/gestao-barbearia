@@ -10,7 +10,7 @@ FROM eclipse-temurin:21-jre-alpine@sha256:974b08960c5d96694c780e65b2d5705268ab1e
 
 WORKDIR /app
 
-RUN apk add --no-cache postgresql17-client \
+RUN apk add --no-cache postgresql17-client curl \
     && addgroup -S app \
     && adduser -S app -G app \
     && mkdir -p /app/backups \
