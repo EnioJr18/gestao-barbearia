@@ -22,8 +22,10 @@ docker-compose.yml     ambiente local integrado
 
 ## Requisitos
 
-- Docker Desktop com Docker Compose.
-- Java 21 para executar a API fora do Docker.
+- Java 21 (necessário para executar e testar o backend fora do Docker).
+- Docker Desktop com Docker Compose v2.
+- Node.js e npm para executar o frontend Vite.
+- Cliente PostgreSQL (`pg_dump`/`pg_restore`) somente para usar backup/restauração quando a API for executada fora do Docker; a imagem do backend já inclui essas ferramentas.
 
 ## Configuração local
 
@@ -33,7 +35,7 @@ Copie o modelo de variáveis e preencha todos os valores obrigatórios:
 Copy-Item .env.example .env
 ```
 
-`.env.example` contém apenas placeholders. Nunca versione `.env`, senhas ou `JWT_SECRET`.
+`.env.example` contém valores de exemplo e placeholders; ajuste-os para seu ambiente local. Nunca versione `.env`, senhas ou `JWT_SECRET`.
 
 Para apontar o frontend para outro endereço da API, copie o modelo específico do Vite:
 
@@ -46,35 +48,55 @@ variável não é definida, o frontend usa `http://localhost:8080/api/v1`, mante
 comportamento padrão de desenvolvimento. Variáveis `VITE_*` são incorporadas ao
 bundle do navegador e não devem conter segredos.
 
-`JWT_SECRET` é obrigatório e precisa ter pelo menos 32 bytes UTF-8. No PowerShell, um valor aleatório pode ser gerado assim:
+Instale as dependências usando o lockfile e inicie o Vite separadamente:
 
 ```powershell
-$bytes = New-Object byte[] 48
-[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-[Convert]::ToBase64String($bytes)
+Set-Location front
+npm ci
+npm run dev
 ```
+
+Por padrão, o Vite fica disponível em `http://localhost:5173`.
+
+`JWT_SECRET` é obrigatório e precisa ter pelo menos 32 bytes UTF-8. Gere e armazene esse segredo em um gerenciador de senhas ou mecanismo seguro de configuração; não o coloque no frontend nem em arquivos versionados.
 
 ## Executar com Docker Compose
 
-Com `.env` preenchido:
+Com `.env` preenchido, o Compose inicia somente PostgreSQL e backend. As portas publicadas são vinculadas a `127.0.0.1` e destinam-se ao acesso local:
 
 ```powershell
-docker compose up --build
+docker compose up --build -d
+docker compose ps
 ```
 
-Serviços principais:
+O backend aguarda o healthcheck do PostgreSQL e também possui healthcheck próprio. O estado `healthy` aparece em `docker compose ps`. A API fica disponível em `http://127.0.0.1:8080` e o PostgreSQL em `127.0.0.1:5432` (ou nas portas definidas por `BACKEND_PORT` e `POSTGRES_PORT`). O Compose não inicia o frontend.
 
-- API: `http://localhost:8080`
-- Frontend Vite: `http://localhost:5173`
-- PostgreSQL: `127.0.0.1:5432`
+Para acompanhar os logs e interromper o ambiente sem remover o volume persistente:
 
-O pgAdmin é opcional e exclusivo para desenvolvimento/manutenção. Para iniciá-lo, defina `PGADMIN_EMAIL` e `PGADMIN_PASSWORD` no `.env` e use:
+```powershell
+docker compose logs -f back postgres
+docker compose down
+```
+
+O pgAdmin é opcional, restrito a `127.0.0.1` e associado ao perfil `dev-tools`. Defina `PGADMIN_EMAIL` e `PGADMIN_PASSWORD` no `.env` e inicie o perfil:
 
 ```powershell
 docker compose --profile dev-tools up --build
 ```
 
-Ele fica disponível somente em `http://127.0.0.1:5050`.
+Ele fica disponível em `http://127.0.0.1:5050` (ou na porta `PGADMIN_PORT`). Sem `--profile dev-tools`, o serviço não é iniciado.
+
+### CORS
+
+O ambiente local autoriza `http://localhost:5173` por padrão. `CORS_ALLOWED_ORIGINS` permite adicionar outras origens, separadas **somente por vírgula**, por exemplo `https://app.exemplo.com` ou `http://localhost:5173,https://app.exemplo.com`. Cada entrada deve ser uma origem HTTP/HTTPS explícita, sem caminho e sem wildcard (`*`).
+
+Em produção, ative o perfil Spring `prod` (ou `production`) e configure explicitamente `CORS_ALLOWED_ORIGINS` com as origens reais do frontend; a aplicação falha na inicialização se a lista estiver ausente, inválida ou contiver localhost/loopback. CORS controla quais navegadores podem ler respostas e não substitui o JWT ou as regras de autorização.
+
+### Healthchecks
+
+- PostgreSQL: `pg_isready` verifica disponibilidade usando usuário e banco definidos para o container, sem senha no comando.
+- Backend: `curl` consulta `GET /actuator/health/readiness` dentro do container. O Actuator expõe somente health, e a resposta não inclui componentes ou detalhes internos. Esse endpoint GET específico é público para permitir a verificação; as rotas operacionais continuam protegidas por JWT.
+- O backend e o pgAdmin aguardam o PostgreSQL ficar saudável antes de iniciar.
 
 ## Backend fora do Docker
 
@@ -87,9 +109,12 @@ SPRING_DATASOURCE_PASSWORD
 JWT_SECRET
 ```
 
-Então:
+Para execução fora do Docker, configure esses valores no ambiente de execução (ou na configuração protegida da IDE); para o banco local, use `localhost` e a porta publicada do PostgreSQL. O CORS local mantém `http://localhost:5173` por padrão. Então:
 
 ```powershell
+# Execute na raiz do repositório para iniciar somente o banco:
+docker compose up -d postgres
+
 Set-Location back
 .\gradlew.bat bootRun
 ```
@@ -166,7 +191,7 @@ Backups são arquivos locais controlados pelo backend, registrados no banco e ar
 
 ## Estado atual
 
-O backend possui caixa, itens, clientes, vendas, despesas, relatórios, autenticação, usuários, backup/restauração e dashboard. O Compose atual é voltado ao desenvolvimento local; empacotamento definitivo do frontend, reverse proxy, healthchecks e observabilidade ficam para a próxima etapa.
+O backend possui caixa, itens, clientes, vendas, despesas, relatórios, autenticação, usuários, backup/restauração e dashboard. O Compose é voltado ao desenvolvimento local; o frontend é executado separadamente pelo Vite. Não use valores de produção ou credenciais reais em arquivos `VITE_*`, pois eles são incorporados ao bundle público.
 
 ## 📄 Licença
 

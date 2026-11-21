@@ -37,3 +37,14 @@ server:
     include-message: never
     include-stacktrace: never
     include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
