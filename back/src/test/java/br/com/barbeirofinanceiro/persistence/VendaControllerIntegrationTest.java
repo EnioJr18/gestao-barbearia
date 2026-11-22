@@ -214,6 +214,22 @@ class VendaControllerIntegrationTest extends PostgresPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(3));
         mockMvc.perform(get("/api/v1/vendas")
+                        .param("clienteNome", "CLIENTE")
+                        .param("status", "FINALIZADA")
+                        .param("size", "1")
+                        .param("page", "1")
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.page").value(1));
+        mockMvc.perform(get("/api/v1/vendas")
+                        .param("clienteNome", "ALVO")
+                        .param("cliente", outroCliente.toString())
+                        .with(user(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(get("/api/v1/vendas")
                         .param("status", "CANCELADA")
                         .with(user(USER)))
                 .andExpect(status().isOk())

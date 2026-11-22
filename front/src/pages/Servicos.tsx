@@ -37,10 +37,11 @@ const formatMoneyInput = (value: string) => {
 export function Servicos() {
   const [modal, setModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(0)
-  const { data, isLoading, error } = useAllItens({
-    nome: search || undefined,
+  const { data, isLoading, error, refetch } = useAllItens({
+    nome: appliedSearch || undefined,
     tipo: 'SERVICO',
     page,
     size: 10,
@@ -87,14 +88,27 @@ export function Servicos() {
           </p>
         )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
-          <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
-            <FiSearch /><input placeholder="Buscar serviço" value={search} onChange={(event) => { setSearch(event.target.value); setPage(0) }} className="w-full bg-transparent text-lg outline-none" />
-          </div>
+          <form className="flex w-full max-w-lg items-center gap-2" onSubmit={(event) => {
+            event.preventDefault()
+            setAppliedSearch(searchInput.trim())
+            setPage(0)
+          }}>
+            <input
+              aria-label="Buscar serviço"
+              placeholder="Buscar serviço"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              className="h-10 min-w-0 flex-1 rounded-lg border bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            />
+            <Button type="submit" variant="outline" className="h-10 gap-2 rounded-lg bg-transparent px-4 text-sm hover:bg-muted/50">
+              <FiSearch /> Buscar
+            </Button>
+          </form>
         </div>
         <table className="w-full min-w-125 border-collapse text-xl [&_td]:text-xl [&_th]:text-base">
           <thead className="bg-muted/40"><tr><th className="px-6 py-5 text-left">SERVIÇO</th><th className="px-6 py-5 text-left">PREÇO</th><th className="px-6 py-5 text-left">STATUS</th><th className="px-6 py-5 text-left">AÇÕES</th></tr></thead>
           <tbody>
-            {isLoading ? <tr><td colSpan={4} className="text-center">Carregando serviços...</td></tr> : error ? <tr><td colSpan={4} className="text-center text-red-600">Não foi possível carregar os serviços.</td></tr> : items.length === 0 ? <tr><td colSpan={4} className="text-center">Nenhum serviço encontrado.</td></tr> : items.map((item) => (
+            {isLoading ? <tr><td colSpan={4} className="text-center">Carregando serviços...</td></tr> : error ? <tr><td colSpan={4} className="text-center text-red-600"><div className="flex flex-col items-center gap-3"><span>Não foi possível carregar os serviços.</span><Button type="button" variant="outline" onClick={() => void refetch()}>Tentar novamente</Button></div></td></tr> : items.length === 0 ? <tr><td colSpan={4} className="text-center">Nenhum serviço encontrado.</td></tr> : items.map((item) => (
               <tr className="border-b transition-colors hover:bg-muted/25 last:border-0" key={item.id}>
                 <td className="px-6 py-6 font-semibold text-foreground">{item.nome}</td>
                 <td className="px-6 py-6 text-muted-foreground">{formatCurrency(Number(item.preco))}</td>

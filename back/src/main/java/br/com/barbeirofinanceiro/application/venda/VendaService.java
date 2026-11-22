@@ -302,6 +302,7 @@ public class VendaService {
             LocalDate dataInicial,
             LocalDate dataFinal,
             UUID cliente,
+            String clienteNome,
             StatusVenda status,
             int page,
             int size
@@ -320,6 +321,11 @@ public class VendaService {
         if (cliente != null) {
             specification = specification.and((root, query, builder) ->
                     builder.equal(root.get("cliente").get("id"), cliente));
+        }
+        if (clienteNome != null && !clienteNome.isBlank()) {
+            String nome = clienteNome.trim().toLowerCase(java.util.Locale.ROOT);
+            specification = specification.and((root, query, builder) ->
+                    builder.like(builder.lower(root.get("cliente").get("nome")), "%" + nome + "%"));
         }
         if (status != null) {
             specification = specification.and((root, query, builder) ->
@@ -354,11 +360,12 @@ public class VendaService {
             LocalDate dataInicial,
             LocalDate dataFinal,
             UUID cliente,
+            String clienteNome,
             StatusVenda status,
             int page,
             int size
     ) {
-        Page<Venda> vendas = listar(dataInicial, dataFinal, cliente, status, page, size);
+        Page<Venda> vendas = listar(dataInicial, dataFinal, cliente, clienteNome, status, page, size);
         if (vendas.isEmpty()) {
             return PageResponseMapper.from(vendas, venda -> VendaResponse.from(venda, List.of(), List.of()));
         }

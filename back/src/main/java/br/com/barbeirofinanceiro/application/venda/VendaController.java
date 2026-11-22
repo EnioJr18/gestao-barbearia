@@ -57,11 +57,12 @@ public class VendaController {
             @RequestParam(required = false) LocalDate dataInicial,
             @RequestParam(required = false) LocalDate dataFinal,
             @RequestParam(required = false) UUID cliente,
+            @RequestParam(required = false) String clienteNome,
             @RequestParam(required = false) StatusVenda status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return service.listarRespostas(dataInicial, dataFinal, cliente, status, page, size);
+        return service.listarRespostas(dataInicial, dataFinal, cliente, clienteNome, status, page, size);
     }
 
     @PostMapping("/{id}/cancelar")

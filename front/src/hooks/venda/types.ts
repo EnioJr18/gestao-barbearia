@@ -35,5 +35,6 @@ export interface ListVendasParams {
   dataInicial?: string
   dataFinal?: string
   cliente?: string
+  clienteNome?: string
   status?: StatusVenda
 }

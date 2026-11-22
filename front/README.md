@@ -1,5 +1,16 @@
 # React + TypeScript + Vite
 
+## Testes do frontend
+
+A suíte usa Vitest, React Testing Library, `@testing-library/user-event`, jsdom e MSW. Os testes estão organizados em `src/test/` por autenticação, componentes, hooks e páginas.
+
+- `npm run test`: inicia o Vitest em modo interativo.
+- `npm run test:run`: executa a suíte uma vez, adequado para validação local e CI.
+- `npm run lint`: verifica o código com ESLint.
+- `npm run build`: valida os tipos TypeScript e gera a build do Vite.
+
+As chamadas HTTP dos testes passam pelo MSW configurado em `src/test/mocks/server.ts`. O setup falha quando uma requisição não possui handler, evitando tráfego acidental para a API real. Os testes de hooks recebem um `QueryClient` novo por caso, com retries desativados.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
