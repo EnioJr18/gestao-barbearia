@@ -7,6 +7,7 @@ import {
   FiMinus,
   FiX,
   FiXCircle,
+  FiSearch,
 } from 'react-icons/fi'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -39,6 +40,8 @@ export function Pedidos() {
   const [dataFinal, setDataFinal] = useState('')
   const [clienteFiltro, setClienteFiltro] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<StatusVenda | ''>('')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [clientId, setClientId] = useState('')
   const [cart, setCart] = useState<Record<string, number>>({})
   const [historicalPrices, setHistoricalPrices] = useState<Record<string, number>>({})
@@ -55,6 +58,7 @@ export function Pedidos() {
     dataInicial: dataInicial || undefined,
     dataFinal: dataFinal || undefined,
     cliente: clienteFiltro || undefined,
+    clienteNome: appliedSearch || undefined,
     status: statusFiltro || undefined,
   })
   const orders = data?.content ?? []
@@ -139,6 +143,8 @@ export function Pedidos() {
   }
 
   const clearFilters = () => {
+    setSearchInput('')
+    setAppliedSearch('')
     setDataInicial('')
     setDataFinal('')
     setClienteFiltro('')
@@ -364,6 +370,24 @@ export function Pedidos() {
           </p>
         )}
         <div className="grid gap-4 border-b bg-muted/20 p-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr_1fr_auto] xl:items-end">
+          <form className="flex items-end gap-2 md:col-span-2 xl:col-span-5" onSubmit={(event) => {
+            event.preventDefault()
+            setAppliedSearch(searchInput.trim())
+            setPage(0)
+          }}>
+            <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-semibold">
+              Buscar por nome do cliente
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Nome do cliente"
+                className="h-10 rounded-lg border bg-background px-3 text-base font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              />
+            </label>
+            <Button type="submit" variant="outline" className="h-10 gap-2 rounded-lg bg-transparent px-4 text-sm hover:bg-muted/50">
+              <FiSearch /> Buscar
+            </Button>
+          </form>
           <label className="grid gap-1.5 text-sm font-semibold">
             Data inicial
             <input

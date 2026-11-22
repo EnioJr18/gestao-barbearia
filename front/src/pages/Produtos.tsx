@@ -43,10 +43,11 @@ const formatMoneyInput = (value: string) => {
 export function Produtos() {
   const [modal, setModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const [page, setPage] = useState(0)
-  const { data, isLoading, error } = useAllItens({
-    nome: search || undefined,
+  const { data, isLoading, error, refetch } = useAllItens({
+    nome: appliedSearch || undefined,
     tipo: 'PRODUTO',
     page,
     size: 10,
@@ -101,15 +102,22 @@ export function Produtos() {
           </p>
         )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
-          <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
-            <FiSearch />
+          <form className="flex w-full max-w-lg items-center gap-2" onSubmit={(event) => {
+            event.preventDefault()
+            setAppliedSearch(searchInput.trim())
+            setPage(0)
+          }}>
             <input
+              aria-label="Buscar produto"
               placeholder="Buscar produto"
-              value={search}
-              onChange={(event) => { setSearch(event.target.value); setPage(0) }}
-              className="w-full bg-transparent text-lg outline-none"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              className="h-10 min-w-0 flex-1 rounded-lg border bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             />
-          </div>
+            <Button type="submit" variant="outline" className="h-10 gap-2 rounded-lg bg-transparent px-4 text-sm hover:bg-muted/50">
+              <FiSearch /> Buscar
+            </Button>
+          </form>
         </div>
         <table className="w-full min-w-150 border-collapse text-xl [&_td]:text-xl [&_th]:text-base">
           <thead className="bg-muted/40">
@@ -125,7 +133,7 @@ export function Produtos() {
             {isLoading ? (
               <tr><td colSpan={5} className="text-center">Carregando produtos...</td></tr>
             ) : error ? (
-              <tr><td colSpan={5} className="text-center text-red-600">Não foi possível carregar os produtos.</td></tr>
+              <tr><td colSpan={5} className="text-center text-red-600"><div className="flex flex-col items-center gap-3"><span>Não foi possível carregar os produtos.</span><Button type="button" variant="outline" onClick={() => void refetch()}>Tentar novamente</Button></div></td></tr>
             ) : items.length === 0 ? (
               <tr><td colSpan={5} className="text-center">Nenhum produto encontrado.</td></tr>
             ) : (
@@ -169,7 +177,7 @@ export function Produtos() {
               <div className="grid size-10 place-items-center rounded-lg bg-amber-50 text-amber-600"><FiBox /></div>
               <div><h2 className="font-heading text-3xl font-bold">{editingId ? 'Editar produto' : 'Novo produto'}</h2><p className="text-md text-muted-foreground">Cadastre um produto para venda.</p></div>
             </div>
-            <form className="grid gap-2" onSubmit={form.handleSubmit(submit)}>
+            <form className="grid gap-2" noValidate onSubmit={form.handleSubmit(submit)}>
               <Label className="text-lg" htmlFor="product-name">Nome do produto</Label>
               <Input id="product-name" className="h-12 text-lg" placeholder="Ex.: Pomada modeladora" {...form.register('nome')} />
               {form.formState.errors.nome && <small className="text-red-500">{form.formState.errors.nome.message}</small>}

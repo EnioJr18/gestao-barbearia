@@ -37,7 +37,8 @@ const formatPhone = (value: string) => {
 export function Clientes() {
   const [modal, setModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [buscar, setBuscar] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
   const { data: clientes = [], isLoading, error } = useAllClientes()
   const createClienteMutation = useCreateCliente()
   const updateClienteMutation = useUpdateCliente()
@@ -46,7 +47,7 @@ export function Clientes() {
   const inactiveClienteMutation = useInactiveCliente()
 
   const filteredClientes = useMemo(() => {
-    const value = buscar.trim().toLowerCase()
+    const value = appliedSearch.toLowerCase()
     if (!value) return clientes
 
     return clientes.filter(
@@ -54,7 +55,7 @@ export function Clientes() {
         cliente.nome.toLowerCase().includes(value) ||
         (cliente.telefone ?? '').toLowerCase().includes(value),
     )
-  }, [clientes, buscar])
+  }, [clientes, appliedSearch])
 
   const form = useForm<ClienteForm>({
     resolver: zodResolver(schema),
@@ -110,15 +111,21 @@ export function Clientes() {
           </p>
         )}
         <div className="flex flex-col items-stretch justify-between gap-4 border-b bg-muted/20 p-5 text-lg sm:flex-row sm:items-center">
-          <div className="flex h-10 w-full max-w-sm items-center gap-2 rounded-lg border bg-background px-3 text-muted-foreground">
-            <FiSearch />
+          <form className="flex w-full max-w-lg items-center gap-2" onSubmit={(event) => {
+            event.preventDefault()
+            setAppliedSearch(searchInput.trim())
+          }}>
             <input
+              aria-label="Buscar cliente"
               placeholder="Buscar cliente"
-              value={buscar}
-              onChange={(event) => setBuscar(event.target.value)}
-              className="w-full bg-transparent text-lg outline-none"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              className="h-10 min-w-0 flex-1 rounded-lg border bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
             />
-          </div>
+            <Button type="submit" variant="outline" className="h-10 gap-2 rounded-lg bg-transparent px-4 text-sm hover:bg-muted/50">
+              <FiSearch /> Buscar
+            </Button>
+          </form>
           <span className="text-sm text-muted-foreground">
             {filteredClientes.length} clientes cadastrados
           </span>

@@ -102,7 +102,7 @@ export function Login() {
               Entre para acompanhar sua barbearia de onde estiver.
             </p>
           </div>
-          <form onSubmit={onSubmit} className="space-y-5">
+          <form onSubmit={onSubmit} noValidate className="space-y-5">
             <Field
               label="E-mail"
               icon={<FiMail />}
